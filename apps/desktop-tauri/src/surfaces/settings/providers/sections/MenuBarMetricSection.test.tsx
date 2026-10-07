@@ -226,8 +226,8 @@ it("offers the provider-declared lane labels in the metric picker", () => {
     base.id = "litellm";
     base.displayName = "LiteLLM";
     base.weekly = rateWindow(30);
-    base.primaryLabel = "Personal budget";
-    base.secondaryLabel = "Team budget";
+    base.primaryLabel = "Fuel Pack";
+    base.secondaryLabel = "Gemini Pro";
 
     render(
       <MenuBarMetricSection
@@ -239,8 +239,8 @@ it("offers the provider-declared lane labels in the metric picker", () => {
       />,
     );
 
-    expect(screen.getByRole("option", { name: "Personal budget" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Team budget" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Fuel Pack" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Gemini Pro" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "ProviderSessionLabel" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "ProviderWeeklyLabel" })).not.toBeInTheDocument();
   });

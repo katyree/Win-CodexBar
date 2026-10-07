@@ -147,6 +147,17 @@ describe("MenuCard", () => {
         WayfinderGatewayStatus: "Gateway",
         WayfinderModels: "Models",
         WayfinderRequests: "Requests",
+        OpenAIChartRequests: "Requests",
+        ProviderTextRequests: "{} requests",
+        ProviderTextCreditsLeft: "{} credits left",
+        ProviderTextBalanceSuffix: "{} balance",
+        ProviderTextResetCreditsAvailable: "{} reset credits available",
+        ProviderLabelAdditionalBudget: "Additional budget",
+        ProviderLabelResetCredits: "Reset credits",
+        ProviderLabelTotalUsage: "Total usage",
+        WindowLabelHours: "{}-hour",
+        WindowLabelDays: "{}-day",
+        ProviderTextNoActiveSession: "No active 5h session",
         WayfinderTokens: "Tokens",
         WayfinderSaved: "Saved",
         WayfinderOffline: "Gateway offline",
@@ -371,7 +382,7 @@ describe("MenuCard", () => {
 
     renderCard(snapshot, { compactOverview: true });
 
-    expect(await screen.findByText("Session")).toBeInTheDocument();
+    expect(await screen.findByText("ProviderSessionLabel")).toBeInTheDocument();
     expect(screen.getByText("ProviderWeeklyLabel")).toBeInTheDocument();
     expect(screen.getByText("ProviderMonthly")).toBeInTheDocument();
     expect(document.querySelectorAll(".menu-metric")).toHaveLength(3);
@@ -396,7 +407,7 @@ describe("MenuCard", () => {
   });
 
   it("localizes Claude scoped weekly extra-window labels", async () => {
-    tauriMocks.getLocaleStrings.mockResolvedValue(buildBundle({ ClaudeScopedWeeklyLabel: "{} weekly" }));
+    tauriMocks.getLocaleStrings.mockResolvedValue(buildBundle({ ClaudeScopedWeeklyLabel: "{} weekly", ProviderLabelModelOnly: "{} only" }));
     const snapshot = provider(null, 20);
     snapshot.extraRateWindows = [
       {
@@ -946,7 +957,13 @@ describe("MenuCard", () => {
     const accounts = container.querySelector(".codex-menu-accounts")!;
     const metrics = container.querySelector(".menu-card__metrics")!;
     expect(accounts.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(container.querySelector<HTMLDetailsElement>(".menu-card__more")?.open).toBe(false);
+    // The usage details block renders once its async data settles.
+    const more = await waitFor(() => {
+      const el = container.querySelector<HTMLDetailsElement>(".menu-card__more");
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(more.open).toBe(false);
   });
 
   it("shows on-pace budgets and expands projection details", async () => {

@@ -23,6 +23,7 @@ import { getProviderIcon } from "../components/providers/providerIcons";
 import { costPeriodShortLabel } from "../lib/costPeriod";
 import { describeProviderState } from "../lib/providerState";
 import { resetDescriptionFallback, windowDetailText } from "../lib/usageWindows";
+import { localizeProviderText } from "../lib/providerText";
 import type {
   BootstrapState,
   ProviderLocalUsageSummary,
@@ -213,6 +214,7 @@ function ProviderPill({
   remainingSuffix: string;
   stateLabel: string;
 }) {
+  const { t } = useLocale();
   const rateWindow = provider.selectedMetric;
   const informational = rateWindow.isInformational === true;
   const remaining = Math.max(0, Math.min(100, rateWindow.remainingPercent));
@@ -228,7 +230,7 @@ function ProviderPill({
   }
 
   const brand = getProviderIcon(provider.providerId).brandColor;
-  const infoText = rateWindow.resetDescription?.trim() || "—";
+  const infoText = localizeProviderText(rateWindow.resetDescription?.trim(), t) || "—";
   const label = state.isProblem
     ? stateLabel
     : informational
@@ -243,7 +245,7 @@ function ProviderPill({
     informational ? null : resetDescriptionFallback(rateWindow),
     resetRelative,
   );
-  const detailText = windowDetailText(rateWindow);
+  const detailText = localizeProviderText(windowDetailText(rateWindow), t) || null;
   const resetSuffix = resetText ? `\n${resetText}` : "";
   const detailSuffix = detailText ? `\n${detailText}` : "";
   const inlineReset = resetText

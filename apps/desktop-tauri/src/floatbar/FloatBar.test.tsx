@@ -228,6 +228,10 @@ describe("FloatBar", () => {
       buildBundle({
         ResetsInHoursMinutes: "Resets in {}h {}m",
         ResetsInDaysHours: "Resets in {}d {}h",
+        ResetsInHoursOnly: "Resets in {}h",
+        ProviderTextNoActiveSession: "No active 5h session",
+        ProviderTextApiRate: "{} API-rate",
+        ProviderTextNoBudgetSet: "No budget set",
         TrayResetsDueNow: "Resetting",
         PanelToday: "Today",
         PanelUsedSuffix: "used",
@@ -326,9 +330,9 @@ describe("FloatBar", () => {
     const { container } = renderFloatBar(bootstrap({ floatBarShowResetInline: true }));
     await waitFor(() => {
       const pill = container.querySelector(".floatbar__pill");
-      expect(pill?.getAttribute("title")).toContain("Claude: 80% used\nResets in 2 hours");
+      expect(pill?.getAttribute("title")).toContain("Claude: 80% used\nResets in 2h");
       expect(pill?.classList.contains("floatbar__pill--warn")).toBe(true);
-      expect(container.querySelector(".floatbar__reset")?.textContent).toContain("2 hours");
+      expect(container.querySelector(".floatbar__reset")?.textContent).toContain("2h");
     });
   });
 

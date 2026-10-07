@@ -164,6 +164,7 @@ export default function AdvancedTab({ settings, set, saving }: TabProps) {
               type="text"
               className="text-input"
               value={codexDirsDraft}
+              aria-label={t("CodexLogPathsLabel")}
               placeholder={String.raw`\\wsl.localhost\<distro>\home\<user>\.codex`}
               disabled={saving}
               onChange={(event) => setCodexDirsDraft(event.target.value)}
@@ -212,6 +213,7 @@ export default function AdvancedTab({ settings, set, saving }: TabProps) {
               type="text"
               className="text-input"
               value={sshHostsDraft}
+              aria-label={t("AgentSessionsSshHostsLabel")}
               disabled={saving || !settings.agentSessionsEnabled}
               onChange={(event) => setSshHostsDraft(event.target.value)}
               onBlur={() => set({ agentSessionSshHosts: parseSshHosts(sshHostsDraft) })}
@@ -300,6 +302,7 @@ export default function AdvancedTab({ settings, set, saving }: TabProps) {
               type="text"
               className="text-input"
               value={proxyUsernameDraft}
+              aria-label={t("NetworkProxyUserLabel")}
               autoComplete="off"
               disabled={saving || !settings.httpProxyEnabled}
               onChange={(event) => setProxyUsernameDraft(event.target.value)}
@@ -317,6 +320,7 @@ export default function AdvancedTab({ settings, set, saving }: TabProps) {
               type="password"
               className="text-input"
               value={proxyPasswordDraft}
+              aria-label={t("NetworkProxyPasswordLabel")}
               autoComplete="new-password"
               disabled={saving || !settings.httpProxyEnabled}
               onChange={(event) => setProxyPasswordDraft(event.target.value)}

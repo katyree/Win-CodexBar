@@ -53,12 +53,12 @@ describe("UsageItemVisibilitySection", () => {
       />,
     );
 
-    expect(screen.getByRole("checkbox", { name: "Session" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "ProviderSessionLabel" })).toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: /Codex Spark/ }),
     ).not.toBeChecked();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Session" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "ProviderSessionLabel" }));
     expect(onChange).toHaveBeenCalledWith({
       providerHiddenUsageItemIds: {
         codex: ["metric:extra-codex-spark", "metric:primary"],

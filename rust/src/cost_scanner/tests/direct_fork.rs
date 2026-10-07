@@ -253,7 +253,20 @@ fn changed_root_revalidates_empty_parent_descendants() {
     // Root history rewritten to a counter above what the child replays. The
     // child must not keep the baseline it inherited through the empty
     // parent; it fails closed instead of billing against a stale origin.
+    let before = std::fs::metadata(&chain.root_file)
+        .unwrap()
+        .modified()
+        .unwrap();
     write_rows(root_dir, "root.jsonl", &chain.root_rows(1_010));
+    // The rewrite has the same length, and on a fast runner it can land in the
+    // same mtime tick, so the scanner would see an unchanged file. Move the
+    // mtime forward so the change is always detected.
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&chain.root_file)
+        .unwrap()
+        .set_modified(before + std::time::Duration::from_secs(2))
+        .unwrap();
     let (summary, _, cache) = scanner.scan_codex_detailed_with_cache(None);
     let child = &cache.files[&chain.child_file.to_string_lossy().to_string()];
     assert!(child.codex_unresolved_fork_parent);

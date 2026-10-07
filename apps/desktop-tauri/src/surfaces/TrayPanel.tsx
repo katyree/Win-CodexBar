@@ -407,7 +407,10 @@ function OverviewSpendSummary({
         </strong>
       </div>
       <div className="settings-section__caption" style={{ marginTop: 4 }}>
-        {aggregate.included} of {aggregate.considered} {t("OverviewSpendProviderCoverage")} · {t("OverviewSpendEstimate")}
+        {t("OverviewSpendProviderCoverage")
+          .replace("{}", String(aggregate.included))
+          .replace("{}", String(aggregate.considered))}{" "}
+        · {t("OverviewSpendEstimate")}
       </div>
     </div>
   );

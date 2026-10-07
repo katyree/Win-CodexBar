@@ -157,10 +157,13 @@ Then follow post-install instructions (permissions / accessibility as prompted).
 2. **Close** any already-running CodexBar instance (single-instance plugin may hand off to the old process).
 3. **Launch** the new binary. For stable automation (no blur-dismiss), set proof mode, e.g.  
    `$env:CODEXBAR_PROOF_MODE = 'settings:menu'`  
-   (settings tab ids: `general`, `providers`, `notifications`, `menuBar`, `menu`, `usageSpend`, `advanced`, `about` — float bar section is on **`menu`**).
-4. **Drive with CUA**: start the driver daemon if needed, then list windows / UIA tree, click the control under test, wait for UI settle, capture before/after screenshots.
-5. **Assert observables** (pixels, window list, checked toggle state, theme still dark under `auto`, float bar window present, etc.) — not only “command exited 0”.
-6. **Attach proof** to the PR (screenshots or short note + paths). If CUA cannot run, say why and attach equivalent manual proof (PR template).
+   (settings tab ids: `general`, `providers`, `notifications`, `menuBar`, `menu`, `usageSpend`, `advanced`, `about` — float bar section is on **`menu`**).  
+   To use CDP, also set `$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=<port>'` (one port per parallel lane).
+4. **Drive in the background only** — never `bring_to_front`, foreground mode, `hotkey`, or `type_text`; they take the user's focus or keyboard.
+   - **CDP (preferred for webview controls):** read `http://127.0.0.1:<port>/json/list` and attach to the window's own page target by URL — main / tray panel / Settings: `http://tauri.localhost/`; float bar: `…?window=floatbar…`. Never the first target: tools that attach to it or open `about:blank` (e.g. browser-use) see a blank page. Click with `Input.dispatchMouseEvent` (does not move the OS cursor or take focus); assert DOM state and the persisted value via the app bridge (`get_settings_snapshot`).
+   - **cua-driver 0.31+:** actions take `element_token` from `get_window_state` (`element_index` / `snapshot_id` are rejected); pixel clicks need a screenshot from the same session first. Pass the same `session` label on the state read and every action that uses its tokens (or keep one `serve` connection); separate one-shot `call`s without it retire the snapshot, so the token goes stale.
+5. **Prove with CUA every time:** `verify_state` (`timeout_ms`, `stable_samples`) for window existence/bounds, real-pixel screenshots via `get_window_state` + `--screenshot-out-file`, and native facts CDP can't see (DWM dark under `auto`, float bar topmost/layered, window frame). CDP screenshots are not proof.
+6. **Attach proof** to the PR: CDP assertions + CUA screenshots; list anything not covered (e.g. tray icon / tray menu pixels) explicitly. If CUA cannot run, say why and attach equivalent manual proof (PR template).
 
 **Do not** treat Vitest/jsdom or `cargo test` alone as sufficient for tray icon, DWM, WebView2 theme, float bar z-order, or settings chrome. **Do not** open issues/PRs against trycua/cua unless the user explicitly asks; use it as tooling.
 
@@ -175,7 +178,7 @@ Then follow post-install instructions (permissions / accessibility as prompted).
   - Screenshots / GIFs for UI changes (Windows)
   - Linked issue / reference when relevant
 - Hosted PR check exists: `ci/circleci: pr-check` is the primary Windows gate; `.github/workflows/pr-check.yml` is manual Blacksmith backup. Porting micro PRs targeting `port/upstream-*` use focused local evidence and intentionally skip automatic hosted Windows CI; same-repository `main`-bound PRs always get the hosted gate; fork PRs never do (see Fork PRs and reviews).
-- UI / tray / settings / float-bar / visual PRs: **CUA Driver proof is the default** ([trycua/cua](https://github.com/trycua/cua)) after a **fresh local rebuild** — see [UI validation with CUA](#ui-validation-with-cua-trycuacua). If CUA cannot be used, explain why and attach equivalent manual proof (PR template checkboxes).
+- UI / tray / settings / float-bar / visual PRs: **hybrid proof is the default** — CDP for actions and state assertions, CUA Driver ([trycua/cua](https://github.com/trycua/cua)) for real-pixel screenshots and native checks — after a **fresh local rebuild** — see [UI validation with CUA](#ui-validation-with-cua-trycuacua). If CUA cannot be used, explain why and attach equivalent manual proof (PR template checkboxes).
 - Before non-trivial merge: thermo-nuclear structure review when the project process requires it.
 
 

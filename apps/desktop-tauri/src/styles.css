@@ -5247,11 +5247,13 @@ html:has(.menu-surface--tray) {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0;
-  justify-content: center;
+  /* `safe`: when long translations overflow, start-align instead of pushing the
+     first tabs past the left edge where scrolling can't reach them. */
+  justify-content: safe center;
   overflow-x: auto;
-  scrollbar-width: none;
+  /* Only shows when the tabs still overflow (very narrow window). */
+  scrollbar-width: thin;
 }
-.settings-tabs::-webkit-scrollbar { display: none; }
 [data-theme="light"] .settings-tabs {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0));
 }
@@ -5261,10 +5263,12 @@ html:has(.menu-surface--tray) {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  flex: 0 0 auto;
+  /* Shrink before overflowing: multi-word labels wrap to two lines. */
+  flex: 0 1 auto;
   min-width: 56px;
   padding: 6px 12px;
   border-radius: 6px;
+  white-space: normal;
   background: transparent;
   color: var(--text-secondary);
   font-size: 0.65rem;
@@ -5295,6 +5299,7 @@ html:has(.menu-surface--tray) {
 .settings-tab__label {
   display: block;
   line-height: 1.1;
+  text-align: center;
 }
 .settings-tab:hover {
   background: rgba(255, 255, 255, 0.05);

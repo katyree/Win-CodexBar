@@ -434,17 +434,12 @@ try {
         return
     }
 
-    $vcRedistPath = Join-Path $InstallerDepsDir "vc_redist.x64.exe"
     $webView2BootstrapperPath = Join-Path $InstallerDepsDir "MicrosoftEdgeWebview2Setup.exe"
 
-    if ($RefreshInstallerDependencies -or -not (Test-Path $vcRedistPath)) {
-        Invoke-DownloadWithRetry -Uri "https://aka.ms/vc14/vc_redist.x64.exe" -OutFile $vcRedistPath
-    }
     if ($RefreshInstallerDependencies -or -not (Test-Path $webView2BootstrapperPath)) {
         Invoke-DownloadWithRetry -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile $webView2BootstrapperPath
     }
 
-    Assert-MicrosoftSignature -Path $vcRedistPath
     Assert-MicrosoftSignature -Path $webView2BootstrapperPath
 
     $iscc = Get-InnoSetupCompiler
@@ -458,7 +453,6 @@ try {
             "/Qp",
             "/DAppVersion=$version",
             "/DTargetBinDir=$releaseBinDir",
-            "/DVCRedistPath=$vcRedistPath",
             "/DWebView2BootstrapperPath=$webView2BootstrapperPath",
             "/DOutputDir=$installerOut",
             "/DOutputBaseFilename=CodexBar-$version-Setup",

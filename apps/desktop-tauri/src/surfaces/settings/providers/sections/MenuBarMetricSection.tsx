@@ -6,6 +6,7 @@ import type {
   SettingsUpdate,
 } from "../../../../types/bridge";
 import type { LocaleKey } from "../../../../i18n/keys";
+import { localizeWindowLabel } from "../../../../lib/windowLabels";
 
 interface Props {
   provider: ProviderDetail;
@@ -92,13 +93,12 @@ function metricOptions(
       value: "session",
       label:
         provider.primaryMetricLabel ??
-        provider.primaryLabel ??
-        t("ProviderSessionLabel"),
+        (localizeWindowLabel(provider.primaryLabel ?? undefined, t) || t("ProviderSessionLabel")),
     },
   ];
 
   if (provider.weekly) {
-    options.push({ value: "weekly", label: provider.secondaryLabel || t("ProviderWeeklyLabel") });
+    options.push({ value: "weekly", label: localizeWindowLabel(provider.secondaryLabel ?? undefined, t) || t("ProviderWeeklyLabel") });
   }
   if (provider.modelSpecific) {
     options.push({ value: "model", label: t("DetailWindowModelSpecific") });

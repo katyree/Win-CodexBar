@@ -1,4 +1,16 @@
 import type React from "react";
+import { createContext, useContext, useId } from "react";
+
+// A Field's label and description ids, so the control inside it gets an
+// accessible name without every call site passing `ariaLabel`.
+const FieldContext = createContext<{ labelId: string; descId?: string } | null>(null);
+
+/** aria props naming a control after its enclosing Field; an explicit ariaLabel wins. */
+export function useFieldAria(ariaLabel?: string) {
+  const field = useContext(FieldContext);
+  if (ariaLabel || !field) return { "aria-label": ariaLabel };
+  return { "aria-labelledby": field.labelId, "aria-describedby": field.descId };
+}
 
 // ── tiny reusable controls ──────────────────────────────────────────
 
@@ -15,12 +27,13 @@ export function Toggle({
   ariaLabel?: string;
   disabled?: boolean;
 }) {
+  const fieldAria = useFieldAria(ariaLabel);
   const input = (
     <input
       type="checkbox"
       className="toggle"
       checked={checked}
-      aria-label={ariaLabel}
+      {...(label ? { "aria-label": ariaLabel } : fieldAria)}
       disabled={disabled}
       onChange={(e) => onChange(e.target.checked)}
     />
@@ -51,13 +64,14 @@ export function Select({
   ariaLabel?: string;
   minWidth?: number;
 }) {
+  const fieldAria = useFieldAria(ariaLabel);
   return (
     <select
       className="select"
       style={{ minWidth }}
       value={value}
       disabled={disabled}
-      aria-label={ariaLabel}
+      {...fieldAria}
       onChange={(e) => onChange(e.target.value)}
     >
       {options.map((o) => (
@@ -86,6 +100,7 @@ export function NumberInput({
   disabled?: boolean;
   ariaLabel?: string;
 }) {
+  const fieldAria = useFieldAria(ariaLabel);
   return (
     <input
       type="number"
@@ -95,7 +110,7 @@ export function NumberInput({
       max={max}
       step={step}
       disabled={disabled}
-      aria-label={ariaLabel}
+      {...fieldAria}
       onChange={(e) => {
         const raw = e.target.value;
         if (raw === "") return;
@@ -119,16 +134,23 @@ export function Field({
   children: React.ReactNode;
   leading?: boolean;
 }) {
+  const id = useId();
+  const ids = { labelId: `${id}-label`, descId: description ? `${id}-desc` : undefined };
+  const control = (
+    <div className="settings-field__control">
+      <FieldContext.Provider value={ids}>{children}</FieldContext.Provider>
+    </div>
+  );
   return (
     <div className={`settings-field${leading ? " settings-field--leading" : ""}`}>
-      {leading && <div className="settings-field__control">{children}</div>}
+      {leading && control}
       <div className="settings-field__text">
-        <span className="settings-field__label">{label}</span>
+        <span id={ids.labelId} className="settings-field__label">{label}</span>
         {description && (
-          <span className="settings-field__desc">{description}</span>
+          <span id={ids.descId} className="settings-field__desc">{description}</span>
         )}
       </div>
-      {!leading && <div className="settings-field__control">{children}</div>}
+      {!leading && control}
     </div>
   );
 }
