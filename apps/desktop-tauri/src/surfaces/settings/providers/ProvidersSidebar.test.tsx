@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -153,5 +154,58 @@ describe("ProvidersSidebar", () => {
     );
 
     expect(await screen.findByRole("button", { name: "Move up Codex" })).toBeDisabled();
+  });
+});
+
+// jsdom runs with `css: false` and no layout, so assert the stylesheet rule
+// directly: translated status lines ("Отключено — авто", ~97px) must wrap
+// inside the ~89px text column at the 600px settings window, not ellipsize.
+if (!import.meta.dirname) {
+  throw new Error("import.meta.dirname unavailable to vitest runner");
+}
+const stylesSource = readFileSync(`${import.meta.dirname}/../../../styles.css`, "utf8");
+
+describe("ProvidersSidebar text fitting", () => {
+  it("wraps names and status lines to two lines instead of one ellipsized line", () => {
+    const match = stylesSource.match(
+      /\.providers-sidebar__name,\s*\.providers-sidebar__subtitle-primary\s*\{([^}]*)\}/,
+    );
+    expect(match).not.toBeNull();
+    const rule = match![1];
+    expect(rule).toMatch(/-webkit-line-clamp:\s*2;/);
+    expect(rule).toMatch(/overflow-wrap:\s*anywhere;/);
+    expect(rule).not.toMatch(/white-space:\s*nowrap/);
+    // No other rule for either element may put the one-line ellipsis back.
+    for (const block of stylesSource.matchAll(/\.providers-sidebar__(?:name|subtitle-primary)\s*\{([^}]*)\}/g)) {
+      expect(block[1]).not.toMatch(/white-space:\s*nowrap/);
+    }
+  });
+
+  it("keeps the full name and status line available as a tooltip", async () => {
+    const providers: ProviderSidebarRow[] = [{
+      id: "alibaba",
+      displayName: "Alibaba Token Plan",
+      enabled: false,
+      status: "disabled",
+      subtitlePrimary: "Отключено — авто",
+    }];
+    const { container } = render(
+      <LocaleProvider>
+        <ProvidersSidebar
+          providers={providers}
+          selectedId={null}
+          searchText=""
+          onSearchTextChange={vi.fn()}
+          onSelect={vi.fn()}
+          onReorder={vi.fn()}
+          onToggleEnabled={vi.fn()}
+        />
+      </LocaleProvider>,
+    );
+    await screen.findByRole("listbox", { name: "ProvidersAriaLabel" });
+    expect(container.querySelector(".providers-sidebar__name")?.getAttribute("title"))
+      .toBe("Alibaba Token Plan");
+    expect(container.querySelector(".providers-sidebar__subtitle-primary")?.getAttribute("title"))
+      .toBe("Отключено — авто");
   });
 });

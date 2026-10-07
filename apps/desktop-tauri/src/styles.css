@@ -2353,9 +2353,19 @@ body:has(.tray-panel-reveal) {
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--provider-row-text-primary);
+}
+
+/* Long names and translated status lines ("Отключено — авто") wrap to a
+   second line instead of ellipsizing in the narrow sidebar; the row's
+   title attribute carries the full text if even two lines are not enough. */
+.providers-sidebar__name,
+.providers-sidebar__subtitle-primary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .providers-sidebar__subtitle {
@@ -2365,12 +2375,6 @@ body:has(.tray-panel-reveal) {
   font-size: 0.72rem;
   color: var(--provider-row-text-secondary);
   line-height: 1.25;
-}
-
-.providers-sidebar__subtitle-primary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .providers-sidebar__subtitle-secondary {

@@ -273,9 +273,14 @@ export function ProvidersSidebar({
               />
               <ProviderIcon providerId={p.id} size={24} />
               <div className="providers-sidebar__text">
-                <span className="providers-sidebar__name">{p.displayName}</span>
+                <span className="providers-sidebar__name" title={p.displayName}>
+                  {p.displayName}
+                </span>
                 <span className="providers-sidebar__subtitle">
-                  <span className="providers-sidebar__subtitle-primary">
+                  <span
+                    className="providers-sidebar__subtitle-primary"
+                    title={p.subtitlePrimary}
+                  >
                     {p.subtitlePrimary}
                   </span>
                   {p.subtitleSecondary && (
