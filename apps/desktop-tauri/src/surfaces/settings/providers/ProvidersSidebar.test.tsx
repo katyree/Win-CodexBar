@@ -165,7 +165,7 @@ if (!import.meta.dirname) {
 }
 const stylesSource = readFileSync(`${import.meta.dirname}/../../../styles.css`, "utf8");
 
-describe("ProvidersSidebar text fitting", () => {
+describe("Providers tab text fitting", () => {
   it("wraps names and status lines to two lines instead of one ellipsized line", () => {
     const match = stylesSource.match(
       /\.providers-sidebar__name,\s*\.providers-sidebar__subtitle-primary\s*\{([^}]*)\}/,
@@ -179,6 +179,13 @@ describe("ProvidersSidebar text fitting", () => {
     for (const block of stylesSource.matchAll(/\.providers-sidebar__(?:name|subtitle-primary)\s*\{([^}]*)\}/g)) {
       expect(block[1]).not.toMatch(/white-space:\s*nowrap/);
     }
+  });
+
+  it("wraps the cookie-source options inside the detail pane", () => {
+    const match = stylesSource.match(/\.provider-detail-segmented\s*\{([^}]*)\}/);
+    expect(match).not.toBeNull();
+    expect(match![1]).toMatch(/flex-wrap:\s*wrap;/);
+    expect(match![1]).toMatch(/max-width:\s*100%;/);
   });
 
   it("keeps the full name and status line available as a tooltip", async () => {

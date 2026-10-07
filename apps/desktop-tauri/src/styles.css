@@ -2580,6 +2580,11 @@ body:has(.tray-panel-reveal) {
 
 .provider-detail-segmented {
   display: inline-flex;
+  /* Translated options ("Автоматически / Вручную / Отключено") wrap inside the
+     detail pane instead of running past the 600px window edge. */
+  flex-wrap: wrap;
+  max-width: 100%;
+  box-sizing: border-box;
   gap: 2px;
   padding: 2px;
   background: var(--provider-row-bg);
