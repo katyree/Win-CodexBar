@@ -8,6 +8,7 @@ const tauriMocks = vi.hoisted(() => ({
   getLocaleStrings: vi.fn(),
   setUiLanguage: vi.fn(),
   claudeAccountsList: vi.fn(),
+  getCodexAccountsState: vi.fn(),
 }));
 
 const eventMocks = vi.hoisted(() => ({
@@ -146,6 +147,17 @@ describe("MenuCard", () => {
         WayfinderGatewayStatus: "Gateway",
         WayfinderModels: "Models",
         WayfinderRequests: "Requests",
+        OpenAIChartRequests: "Requests",
+        ProviderTextRequests: "{} requests",
+        ProviderTextCreditsLeft: "{} credits left",
+        ProviderTextBalanceSuffix: "{} balance",
+        ProviderTextResetCreditsAvailable: "{} reset credits available",
+        ProviderLabelAdditionalBudget: "Additional budget",
+        ProviderLabelResetCredits: "Reset credits",
+        ProviderLabelTotalUsage: "Total usage",
+        WindowLabelHours: "{}-hour",
+        WindowLabelDays: "{}-day",
+        ProviderTextNoActiveSession: "No active 5h session",
         WayfinderTokens: "Tokens",
         WayfinderSaved: "Saved",
         WayfinderOffline: "Gateway offline",
@@ -183,6 +195,15 @@ describe("MenuCard", () => {
       },
     });
     eventMocks.listen.mockResolvedValue(() => {});
+  });
+
+  it("keeps Codex sign-in discoverable beside an authentication error with no accounts", async () => {
+    tauriMocks.getCodexAccountsState.mockResolvedValueOnce({ accounts: [], accountOrdinals: {}, snapshots: {} });
+    const codex = { ...provider("Authentication required"), providerId: "codex", displayName: "Codex", errorState: "needsAuthentication" as const };
+    render(<LocaleProvider><MenuCard provider={codex} display={{ hideEmail: false, resetTimeRelative: true, showResetWhenExhausted: true }} /></LocaleProvider>);
+    expect(await screen.findByText("Authentication required")).toBeDefined();
+    const add = await screen.findByRole("button", { name: "CodexAccountsSignInButton" });
+    await waitFor(() => expect(add).toBeEnabled());
   });
 
   it("keeps Fireworks vendor API spend visible when local cost summaries are hidden", async () => {
@@ -361,7 +382,7 @@ describe("MenuCard", () => {
 
     renderCard(snapshot, { compactOverview: true });
 
-    expect(await screen.findByText("Session")).toBeInTheDocument();
+    expect(await screen.findByText("ProviderSessionLabel")).toBeInTheDocument();
     expect(screen.getByText("ProviderWeeklyLabel")).toBeInTheDocument();
     expect(screen.getByText("ProviderMonthly")).toBeInTheDocument();
     expect(document.querySelectorAll(".menu-metric")).toHaveLength(3);
@@ -386,7 +407,7 @@ describe("MenuCard", () => {
   });
 
   it("localizes Claude scoped weekly extra-window labels", async () => {
-    tauriMocks.getLocaleStrings.mockResolvedValue(buildBundle({ ClaudeScopedWeeklyLabel: "{} weekly" }));
+    tauriMocks.getLocaleStrings.mockResolvedValue(buildBundle({ ClaudeScopedWeeklyLabel: "{} weekly", ProviderLabelModelOnly: "{} only" }));
     const snapshot = provider(null, 20);
     snapshot.extraRateWindows = [
       {
@@ -936,7 +957,13 @@ describe("MenuCard", () => {
     const accounts = container.querySelector(".codex-menu-accounts")!;
     const metrics = container.querySelector(".menu-card__metrics")!;
     expect(accounts.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(container.querySelector<HTMLDetailsElement>(".menu-card__more")?.open).toBe(false);
+    // The usage details block renders once its async data settles.
+    const more = await waitFor(() => {
+      const el = container.querySelector<HTMLDetailsElement>(".menu-card__more");
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(more.open).toBe(false);
   });
 
   it("shows on-pace budgets and expands projection details", async () => {

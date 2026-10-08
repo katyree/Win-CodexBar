@@ -194,7 +194,7 @@ pub fn restore_minimized_without_activation(window: &impl raw_window_handle::Has
 pub fn restore_minimized_without_activation(_window: &impl raw_window_handle::HasWindowHandle) {}
 
 #[cfg(windows)]
-fn root_hwnd(window: &impl raw_window_handle::HasWindowHandle) -> Option<isize> {
+pub(super) fn root_hwnd(window: &impl raw_window_handle::HasWindowHandle) -> Option<isize> {
     const GA_ROOT: u32 = 2;
     let handle = window.window_handle().ok()?;
     let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() else {

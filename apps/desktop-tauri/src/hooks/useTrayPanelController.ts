@@ -8,6 +8,7 @@ import {
   flyoutStoredSize,
   openSettingsWindow,
   quitApp as quitApplication,
+  reanchorTrayPanel,
   reorderProviders,
   setFlyoutSize,
   updateSettings,
@@ -233,8 +234,23 @@ export function useTrayPanelController(state: BootstrapState) {
       window.clearTimeout(saveSizeTimerRef.current);
     }
     saveSizeTimerRef.current = window.setTimeout(() => {
-      setFlyoutSizeState([width, height]);
-      void setFlyoutSize(width, height).catch(() => {});
+      // The drag reports physical px. Keep logical px so the size holds on a
+      // monitor with another DPI; the scale is read once the window settled,
+      // so a resize caused by such a move converts with the new scale.
+      void getCurrentWindow()
+        .scaleFactor()
+        .then((scale) => {
+          const logical: [number, number] = [
+            Math.round(width / scale),
+            Math.round(height / scale),
+          ];
+          setFlyoutSizeState(logical);
+          // Re-anchor at the new size like every other resize, so a panel
+          // widened from its tray-facing edge doesn't stay past the taskbar.
+          void Promise.resolve(reanchorTrayPanel()).catch(() => {});
+          return setFlyoutSize(logical[0], logical[1]);
+        })
+        .catch(() => {});
     }, 300);
   }, []);
   useEffect(

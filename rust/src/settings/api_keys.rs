@@ -55,7 +55,10 @@ impl ApiKeys {
 
     /// Get API key for a provider
     pub fn get(&self, provider_id: &str) -> Option<&str> {
-        self.keys.get(provider_id).map(|e| e.api_key.as_str())
+        self.keys
+            .get(provider_id)
+            .map(|e| e.api_key.as_str())
+            .filter(|key| !key.is_empty())
     }
 
     /// Set API key for a provider
@@ -86,11 +89,33 @@ impl ApiKeys {
     }
 
     /// Store or clear a provider-specific API-version override.
+    ///
+    /// The override may be chosen before an API key is saved; it is then kept on a
+    /// key-less entry that `get`, `has_key` and `get_all_for_display` ignore.
     pub fn set_api_version(&mut self, provider_id: &str, api_version: Option<String>) {
-        if let Some(entry) = self.keys.get_mut(provider_id) {
-            entry.api_version = api_version
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty());
+        let api_version = api_version
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        match self.keys.get_mut(provider_id) {
+            Some(entry) => {
+                entry.api_version = api_version;
+                if entry.api_key.is_empty() && entry.api_version.is_none() {
+                    self.keys.remove(provider_id);
+                }
+            }
+            None => {
+                if api_version.is_some() {
+                    self.keys.insert(
+                        provider_id.to_string(),
+                        ApiKeyEntry {
+                            api_key: String::new(),
+                            saved_at: chrono::Utc::now().format("%Y-%m-%d %H:%M").to_string(),
+                            label: None,
+                            api_version,
+                        },
+                    );
+                }
+            }
         }
     }
 
@@ -111,6 +136,7 @@ impl ApiKeys {
     pub fn get_all_for_display(&self) -> Vec<SavedApiKeyInfo> {
         self.keys
             .iter()
+            .filter(|(_, entry)| !entry.api_key.is_empty())
             .map(|(id, entry)| {
                 let provider_name = ProviderId::from_cli_name(id)
                     .map(|p| p.display_name().to_string())
@@ -751,6 +777,30 @@ mod tests {
 
         assert_eq!(keys.get("azureopenai"), Some("new-key"));
         assert_eq!(keys.api_version("azureopenai"), Some("v1"));
+    }
+
+    #[test]
+    fn api_version_set_before_api_key_is_kept() {
+        let mut keys = ApiKeys::default();
+        keys.set_api_version("azureopenai", Some("v1".to_string()));
+
+        assert_eq!(keys.api_version("azureopenai"), Some("v1"));
+        assert_eq!(keys.get("azureopenai"), None);
+        assert!(!keys.has_key("azureopenai"));
+        assert!(keys.get_all_for_display().is_empty());
+
+        keys.set("azureopenai", "key", None);
+        assert_eq!(keys.get("azureopenai"), Some("key"));
+        assert_eq!(keys.api_version("azureopenai"), Some("v1"));
+    }
+
+    #[test]
+    fn clearing_api_version_without_api_key_drops_the_entry() {
+        let mut keys = ApiKeys::default();
+        keys.set_api_version("azureopenai", Some("v1".to_string()));
+        keys.set_api_version("azureopenai", None);
+
+        assert!(keys.keys.is_empty());
     }
 
     #[test]

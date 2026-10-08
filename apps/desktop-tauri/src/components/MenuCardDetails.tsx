@@ -35,6 +35,8 @@ import { isMonthlyLimitBlockActive } from "../lib/monthlyLimitBlock";
 import { periodCostLabel, periodTokensLabel } from "../lib/costPeriod";
 import { providerCostPeriodTitle } from "../lib/providerLabels";
 import { resetDescriptionFallback, windowDetailText } from "../lib/usageWindows";
+import { localizeProviderText } from "../lib/providerText";
+import { localizeProviderLabel } from "../lib/windowLabels";
 import { isDetailSectionVisible } from "../lib/usageItemVisibility";
 import PaceDetailsChart from "./PaceDetailsChart";
 
@@ -389,14 +391,15 @@ function MetricRow({
   const barDisplayPct = showAsUsed ? barPct : Math.max(0, Math.min(100, remain));
   const displayLabel = showAsUsed ? t("PanelUsedSuffix") : t("PanelLeftSuffix");
   const level = levelOf(remain, snap.isExhausted);
-  const detailText = windowDetailText(snap);
+  const detailText = localizeProviderText(windowDetailText(snap), t) || null;
   const resetText = useFormattedResetTime(
     blocked ? null : snap.resetsAt,
     isInformational || blocked ? null : resetDescriptionFallback(snap),
     resetTimeRelative,
     resetFormatMode ?? "reset",
   );
-  const infoPrimary = snap.resetDescription?.trim() || resetText || "—";
+  const infoPrimary =
+    localizeProviderText(snap.resetDescription?.trim(), t) || resetText || "—";
   const resetTarget = snap.resetsAt ? Date.parse(snap.resetsAt) : Number.NaN;
   const replacesPercent =
     showResetWhenExhausted &&
@@ -704,7 +707,7 @@ export default function MenuCardDetails({
             >
               {group.title && (
                 <div className="menu-card__group-title" role="heading" aria-level={4}>
-                  {group.title}
+                  {localizeProviderLabel(group.title, t)}
                 </div>
               )}
               {group.rows.map((detail, index) => (

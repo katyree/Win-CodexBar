@@ -38,7 +38,7 @@ Cargo workspace (root `Cargo.toml`): members `rust`, `apps/desktop-tauri/src-tau
 
 ## Surfaces (desktop)
 
-- **Tray panel** — left-click tray; blur-dismiss (suppressed in proof mode).
+- **Tray panel** — left-click tray; blur-dismiss (suppressed in proof mode, and while a mouse button is held on the panel so a frame move/resize doesn't close it). Opens next to the tray until the user drags its top strip elsewhere; `shell/flyout_placement.rs` remembers that spot (double-click the strip to forget it). Resizable from every edge and corner.
 - **Tray panel flyout** — larger dashboard window opened from the tray
   menu ("Pop Out Dashboard"); the tray panel itself is the only
   dashboard layout.

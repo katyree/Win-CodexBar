@@ -928,6 +928,10 @@ pub enum ManualEmptyCookiePolicy {
 }
 
 /// Trait that all providers must implement
+#[allow(
+    clippy::double_must_use,
+    reason = "async-trait marks its boxed futures #[must_use]"
+)]
 #[async_trait]
 pub trait Provider: Send + Sync {
     /// Get the provider's unique identifier

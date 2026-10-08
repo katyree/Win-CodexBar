@@ -154,8 +154,15 @@ pub(super) async fn managed_spawn_is_csrf_gated(binary: Option<PathBuf>) -> bool
 }
 
 async fn fetch_print_usage(binary: &Path) -> Result<ProviderFetchResult, LiveFailure> {
+    fetch_print_usage_with_version_timeout(binary, VERSION_TIMEOUT).await
+}
+
+async fn fetch_print_usage_with_version_timeout(
+    binary: &Path,
+    version_timeout: Duration,
+) -> Result<ProviderFetchResult, LiveFailure> {
     let version =
-        run_cli_command(binary, &VERSION_ARGS, VERSION_TIMEOUT, VERSION_TOO_LARGE).await?;
+        run_cli_command(binary, &VERSION_ARGS, version_timeout, VERSION_TOO_LARGE).await?;
     let version = String::from_utf8_lossy(&version);
     if !is_supported_version(version.trim()) {
         return Err(ProviderError::Parse(
@@ -454,6 +461,11 @@ mod tests {
         );
     }
 
+    /// Version-probe timeout for the `agy.cmd` fixtures. cmd.exe startup on a
+    /// loaded CI runner can exceed the production 3 s limit.
+    #[cfg(windows)]
+    const FIXTURE_VERSION_TIMEOUT: Duration = Duration::from_secs(30);
+
     /// A stand-in `agy` that reports a supported version and then fails the
     /// usage report with fixed stderr and exit code.
     #[cfg(windows)]
@@ -493,9 +505,12 @@ mod tests {
         ];
         for (stderr, code, reason) in cases {
             let fixture = failing_agy(stderr, code);
-            let failure = fetch_print_usage(&fixture.path().join("agy.cmd"))
-                .await
-                .expect_err("a failing agy cannot report usage");
+            let failure = fetch_print_usage_with_version_timeout(
+                &fixture.path().join("agy.cmd"),
+                FIXTURE_VERSION_TIMEOUT,
+            )
+            .await
+            .expect_err("a failing agy cannot report usage");
             assert_eq!(
                 failure.reason(),
                 LiveFailureReason::CliReport(CliPrintFailure::Exited { code, reason }),
@@ -522,9 +537,12 @@ mod tests {
     #[tokio::test]
     async fn signed_out_print_usage_process_requires_authentication() {
         let fixture = failing_agy("You are not logged into Antigravity", 1);
-        let failure = fetch_print_usage(&fixture.path().join("agy.cmd"))
-            .await
-            .expect_err("a signed-out agy cannot report usage");
+        let failure = fetch_print_usage_with_version_timeout(
+            &fixture.path().join("agy.cmd"),
+            FIXTURE_VERSION_TIMEOUT,
+        )
+        .await
+        .expect_err("a signed-out agy cannot report usage");
         assert!(failure.is_auth_required());
     }
 

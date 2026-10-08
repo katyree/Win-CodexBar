@@ -1,4 +1,18 @@
+## [Unreleased]
+
+### Improved
+- Keep saved Grok account usage tied to its login, renew expiring credentials, and coordinate optional account selection and reconnects with Orca.
+- Show both Codex account quota windows, expand account lists by default, and place Grok refresh in its card header.
+- Open desktop launches near the cursor while retaining the current foreground activation policy.
+
 # Changelog
+
+## [Windows] Unreleased
+
+- Show independent session and weekly usage for native saved Claude Code accounts, with account-scoped OAuth renewal and safe authentication warnings.
+- Offer Refresh login beside Switch only for Claude and Codex accounts that need sign-in. Repair the selected saved login without switching to another account.
+- Use expanded, collapsible Claude and Codex account sections with Add account below the rows; keep the floating bar's usage footprint when authentication expires.
+- Let the tray panel be moved and resized again: drag the strip along its top to move it (the spot is remembered; double-click returns it next to the tray), resize from any edge or corner, and stop it from closing when a resize starts on its outer frame. Its remembered size is now kept in logical pixels, so it fits monitors with different scaling (a size saved by an earlier version is reset to the automatic size once).
 
 ## [Windows] 0.70.0 - 2026-10-03
 
@@ -135,6 +149,7 @@ allowances and per-model spending, clearer account switching, and steadier
 menu-bar layout.
 
 ### Added
+- Codex accounts: show both five-hour and weekly usage windows with independent reset times in the tray, and include both limits in Settings.
 - Cost history: add provider-scoped, display-only Codex and Claude quota-window projection primitives with exact reset boundaries, independent token/cost completeness, and backward-compatible local evidence handling.
 - Provider charts: show recent Codex and Claude quota-window history with explicit account scope and estimated-boundary markers; historical data remains display-only.
 - Grok: Settings and tray **Add account** flow matching Codex/Claude — isolated `grok login --oauth`, save current CLI login, switch, and remove without logging out the active session.

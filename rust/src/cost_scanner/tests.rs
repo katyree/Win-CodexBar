@@ -3569,3 +3569,55 @@ mod period;
 #[cfg(test)]
 #[path = "tests/archived.rs"]
 mod archived;
+
+/// #755: a background scan paused with `no_progress` and no retained report
+/// used to sum every cached day, so Today and 30d showed the same totals.
+#[test]
+fn paused_scan_without_previous_report_reports_only_the_requested_days() {
+    let root = tempfile::tempdir().unwrap();
+    let sessions = root.path().join("sessions");
+    std::fs::create_dir_all(&sessions).unwrap();
+    let cache_root = root.path().join("cache");
+    let today = Local::now().date_naive();
+    let older = (today - chrono::Duration::days(10))
+        .format("%Y-%m-%d")
+        .to_string();
+    let today = today.format("%Y-%m-%d").to_string();
+    let mut cache = CostUsageCache {
+        files: HashMap::from([
+            (
+                "today".to_string(),
+                cached_usage_with_packed(&today, "gpt-5.6-sol", vec![1_000, 400, 10]),
+            ),
+            (
+                "older".to_string(),
+                cached_usage_with_packed(&older, "gpt-5.6-sol", vec![5_000, 2_000, 50]),
+            ),
+        ]),
+        // A queued file whose fork parent never resolved keeps the current
+        // window unestablished, as in the reported cache.
+        codex_pending_paths: vec![root.path().join("gone.jsonl").to_string_lossy().to_string()],
+        codex_scan_incomplete: true,
+        codex_scan_pause_reason: Some(CodexScanPauseReason::NoProgress),
+        ..Default::default()
+    };
+    rebuild_cache_days(&mut cache);
+    JsonlScanner::save_cache(ProviderId::Codex, &mut cache, Some(&cache_root));
+
+    let scan = |days| {
+        CostScanner::new(days)
+            .with_cache_root(&cache_root)
+            .with_sessions_dirs(vec![sessions.clone()])
+            .scan_codex_detailed_with_cache(None)
+    };
+    let (today_summary, today_stats, _) = scan(1);
+    let (month_summary, month_stats, _) = scan(30);
+
+    assert_eq!(today_stats.files_parsed, 0);
+    assert_eq!(month_stats.files_parsed, 0);
+    assert_eq!(today_summary.input_tokens, 1_000);
+    assert_eq!(today_summary.output_tokens, 10);
+    assert_eq!(month_summary.input_tokens, 6_000);
+    assert_eq!(month_summary.output_tokens, 60);
+    assert!(today_summary.total_cost_usd < month_summary.total_cost_usd);
+}

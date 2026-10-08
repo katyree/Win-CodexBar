@@ -116,10 +116,10 @@ pub fn close_settings_window(
     crate::shell::settings_window::dismiss(&app, &window)
 }
 
-/// Persist a user-chosen size for the "Pop Out Dashboard" flyout window.
-/// Only the size is stored (via a size-only `StoredSize` entry — no
-/// fabricated `x`/`y`); the flyout is always re-anchored above the tray on
-/// open. The frontend calls this on genuine user drag-resizes, not on its own
+/// Persist a user-chosen size (logical px) for the "Pop Out Dashboard" flyout
+/// window. Only the size is stored (via a size-only `StoredSize` entry — no
+/// fabricated `x`/`y`); the position is tracked separately, only once the
+/// user drags the flyout. The frontend calls this on genuine user drag-resizes, not on its own
 /// auto-fit resizes, so auto-fit sizes never freeze the panel.
 #[tauri::command]
 pub fn set_flyout_size(width: f64, height: f64) -> Result<(), String> {
@@ -127,6 +127,13 @@ pub fn set_flyout_size(width: f64, height: f64) -> Result<(), String> {
     let height = (height.round() as i64).clamp(1, i64::from(u32::MAX)) as u32;
     crate::shell::flyout_window::save_stored_size(width, height);
     Ok(())
+}
+
+/// Forget where the user dragged the flyout and anchor it to the tray again
+/// (double-click on the panel's move handle).
+#[tauri::command]
+pub fn reset_flyout_position(app: tauri::AppHandle) -> Result<(), String> {
+    crate::shell::flyout_window::reset_position(&app)
 }
 
 /// Return the remembered flyout size, if the user has manually resized it.

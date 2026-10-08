@@ -1239,7 +1239,7 @@ mod tests {
 
         assert!(label.contains("リセットまで"), "{label}");
         assert!(!label.to_ascii_lowercase().contains("resets in"), "{label}");
-        assert!(label.contains("2h 05m"), "{label}");
+        assert!(label.contains("2時間 05分"), "{label}");
     }
 
     #[test]

@@ -81,7 +81,7 @@ describe("CodexAccountsSection", () => {
     expect(screen.getByText("user-2@example.com")).toBeDefined();
     expect(screen.getByText("CodexAccountsSourceManaged")).toBeDefined();
     expect(screen.getByText("CodexAccountsSourceAmbient")).toBeDefined();
-    expect(screen.getAllByText("CodexAccountsReauthenticateButton")).toHaveLength(1);
+    expect(screen.queryByText("CodexAccountsReauthenticateButton")).toBeNull();
   });
 
   it("redacts every row (ambient + managed) when privacy is on", async () => {
@@ -153,14 +153,36 @@ describe("CodexAccountsSection", () => {
     );
     render(<CodexAccountsSection t={t} />);
     await waitFor(() => {
-      expect(screen.getByText("free · 38%")).toBeDefined();
+      expect(screen.getByText("free · 1h 38%")).toBeDefined();
     });
   });
 
-  it("offers ambient reauthentication and reloads the account state", async () => {
-    const ambient = account("ambient", { source: "ambient" });
+  it("shows both five-hour and weekly limits in the settings pill", async () => {
+    const usage = snapshot(14, "plus");
+    usage.primaryWindow!.limitWindowSeconds = 18_000;
+    usage.secondaryWindow = { usedPercent: 93, resetAt: null, limitWindowSeconds: 604_800 };
+    tauriMocks.getCodexAccountsState.mockResolvedValue({
+      accounts: [account("1")], accountOrdinals: { "1": 1 }, snapshots: { "1": usage },
+    });
+    render(<CodexAccountsSection t={t} />);
+    expect(await screen.findByText("plus · 5h 14% · 7d 93%")).toBeInTheDocument();
+  });
+
+  it("shows weekly-only limits in the settings pill", async () => {
+    const usage = snapshot(42, "pro");
+    usage.secondaryWindow = { ...usage.primaryWindow!, limitWindowSeconds: 604_800 };
+    usage.primaryWindow = null;
+    tauriMocks.getCodexAccountsState.mockResolvedValue({
+      accounts: [account("1")], accountOrdinals: { "1": 1 }, snapshots: { "1": usage },
+    });
+    render(<CodexAccountsSection t={t} />);
+    expect(await screen.findByText("pro · 7d 42%")).toBeInTheDocument();
+  });
+
+  it.each(["ambient", "managedByApp"] as const)("offers %s reauthentication and reloads the account state", async (source) => {
+    const ambient = account("ambient", { source });
     tauriMocks.getCodexAccountsState
-      .mockResolvedValueOnce({ accounts: [ambient], accountOrdinals: { ambient: 1 }, snapshots: {} } as CodexAccountsStateBridge)
+      .mockResolvedValueOnce({ accounts: [ambient], accountOrdinals: { ambient: 1 }, snapshots: {}, needsAuthentication: { ambient: true } } as CodexAccountsStateBridge)
       .mockResolvedValueOnce({ accounts: [ambient], accountOrdinals: { ambient: 1 }, snapshots: { ambient: snapshot(12) } } as CodexAccountsStateBridge);
     tauriMocks.codexAccountReauthenticate.mockResolvedValue(ambient);
 
@@ -172,8 +194,9 @@ describe("CodexAccountsSection", () => {
     });
 
     expect(tauriMocks.codexAccountReauthenticate).toHaveBeenCalledTimes(1);
+    expect(tauriMocks.codexAccountReauthenticate).toHaveBeenCalledWith("ambient");
     await waitFor(() => {
-      expect(screen.getByText("free · 12%")).toBeDefined();
+      expect(screen.getByText("free · 1h 12%")).toBeDefined();
     });
   });
 

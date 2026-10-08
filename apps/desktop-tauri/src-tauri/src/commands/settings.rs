@@ -559,11 +559,19 @@ fn parse_language(s: &str) -> Option<Language> {
     Language::resolve(s)
 }
 
+/// Serializes the load -> patch -> save of `update_settings`. Commands run
+/// concurrently, so two overlapping patches would otherwise both load the same
+/// file and the later save would drop the earlier change.
+static UPDATE_SETTINGS_LOCK: Mutex<()> = Mutex::new(());
+
 #[tauri::command]
 pub async fn update_settings(
     app: tauri::AppHandle,
     patch: SettingsUpdate,
 ) -> Result<SettingsSnapshot, String> {
+    let write_guard = UPDATE_SETTINGS_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut settings = Settings::load();
     let notify_float_bar = patch.notifies_float_bar();
     let refresh_provider_data = patch.refreshes_provider_data();
@@ -585,6 +593,7 @@ pub async fn update_settings(
     }
 
     settings.save().map_err(|e| e.to_string())?;
+    drop(write_guard);
     if clear_local_usage_cache {
         crate::commands::clear_provider_local_usage_cache();
     }

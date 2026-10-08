@@ -23,6 +23,7 @@ import { getProviderIcon } from "../components/providers/providerIcons";
 import { costPeriodShortLabel } from "../lib/costPeriod";
 import { describeProviderState } from "../lib/providerState";
 import { resetDescriptionFallback, windowDetailText } from "../lib/usageWindows";
+import { localizeProviderText } from "../lib/providerText";
 import type {
   BootstrapState,
   ProviderLocalUsageSummary,
@@ -213,6 +214,7 @@ function ProviderPill({
   remainingSuffix: string;
   stateLabel: string;
 }) {
+  const { t } = useLocale();
   const rateWindow = provider.selectedMetric;
   const informational = rateWindow.isInformational === true;
   const remaining = Math.max(0, Math.min(100, rateWindow.remainingPercent));
@@ -228,18 +230,22 @@ function ProviderPill({
   }
 
   const brand = getProviderIcon(provider.providerId).brandColor;
-  const infoText = rateWindow.resetDescription?.trim() || "—";
+  const infoText = localizeProviderText(rateWindow.resetDescription?.trim(), t) || "—";
   const label = state.isProblem
     ? stateLabel
     : informational
       ? infoText
       : `${Math.round(displayPercent)}%`;
+  // Only percentages size the warning placeholder; informational text would
+  // widen the pill after an error.
+  const lastPercentageLabel = useRef("0%");
+  if (!state.isProblem && !informational) lastPercentageLabel.current = label;
   const resetText = useFormattedResetTime(
     rateWindow.resetsAt,
     informational ? null : resetDescriptionFallback(rateWindow),
     resetRelative,
   );
-  const detailText = windowDetailText(rateWindow);
+  const detailText = localizeProviderText(windowDetailText(rateWindow), t) || null;
   const resetSuffix = resetText ? `\n${resetText}` : "";
   const detailSuffix = detailText ? `\n${detailText}` : "";
   const inlineReset = resetText
@@ -265,8 +271,13 @@ function ProviderPill({
         <ProviderIcon providerId={provider.providerId} size={iconSize} />
       </span>
       <span className="floatbar__text" data-tauri-drag-region>
-        <span className="floatbar__pct" data-tauri-drag-region>
-          {label}
+        <span className="floatbar__pct" aria-label={state.isProblem ? stateLabel : undefined} data-tauri-drag-region>
+          {state.isProblem ? (
+            <>
+              <span aria-hidden="true" style={{ visibility: "hidden" }}>{lastPercentageLabel.current}</span>
+              <span className="floatbar__warning" aria-hidden="true">!</span>
+            </>
+          ) : label}
         </span>
         {showResetInline && resetText && inlineReset && (
           <span

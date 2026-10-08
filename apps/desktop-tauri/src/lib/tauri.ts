@@ -48,10 +48,11 @@ import type {
   CurrencyRatesSnapshot,
 } from "../types/bridge";
 
-export const claudeAccountsList = () => invoke<ClaudeAccount[]>("claude_accounts_list");
+export const claudeAccountsList = () => invoke<ClaudeAccount[]>("get_claude_accounts_state");
 export const claudeReconciliationState = () =>
   invoke<ClaudeReconciliationSnapshot | null>("claude_reconciliation_state");
 export const claudeAccountAdd = () => invoke<void>("claude_account_add");
+export const claudeAccountReauthenticate = (id: string) => invoke<void>("claude_account_add", { id });
 export const claudeAccountCancelLogin = () => invoke<void>("claude_account_cancel_login");
 export const claudeAccountSaveCurrent = () => invoke<void>("claude_account_save_current");
 export const claudeAccountRemove = (id: string) => invoke<void>("claude_account_remove", { id });
@@ -59,6 +60,7 @@ export const claudeAccountSwitch = (id: string) =>
   invoke<ClaudeReconciliationSnapshot>("claude_account_switch", { id });
 export const grokAccountsList = () => invoke<GrokAccount[]>("grok_accounts_list");
 export const grokAccountAdd = () => invoke<void>("grok_account_add");
+export const grokAccountReauthenticate = (id: string) => invoke<void>("grok_account_reauthenticate", { id });
 export const grokAccountCancelLogin = () => invoke<void>("grok_account_cancel_login");
 export const grokAccountSaveCurrent = () => invoke<void>("grok_account_save_current");
 export const grokAccountRemove = (id: string) => invoke<void>("grok_account_remove", { id });
@@ -553,6 +555,11 @@ export function setFlyoutSize(width: number, height: number): Promise<void> {
   return invoke<void>("set_flyout_size", { width, height });
 }
 
+/** Forget where the user dragged the flyout and anchor it to the tray again. */
+export function resetFlyoutPosition(): Promise<void> {
+  return invoke<void>("reset_flyout_position");
+}
+
 /** The remembered flyout size ([w, h]) if the user has resized it, else null. */
 export function flyoutStoredSize(): Promise<[number, number] | null> {
   return invoke<[number, number] | null>("flyout_stored_size");
@@ -572,8 +579,8 @@ export function codexAccountAdd(): Promise<CodexAccount> {
   return invoke<CodexAccount>("codex_account_add");
 }
 
-export function codexAccountReauthenticate(): Promise<CodexAccount> {
-  return invoke<CodexAccount>("codex_account_reauthenticate");
+export function codexAccountReauthenticate(id?: string): Promise<CodexAccount> {
+  return invoke<CodexAccount>("codex_account_reauthenticate", id ? { id } : undefined);
 }
 
 export function codexAccountRemove(id: string): Promise<void> {

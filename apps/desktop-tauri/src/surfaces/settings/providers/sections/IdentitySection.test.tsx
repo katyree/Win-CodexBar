@@ -42,3 +42,45 @@ describe("IdentitySection OpenAI project privacy", () => {
     expect(screen.getAllByText(/proj-private/)).toHaveLength(2);
   });
 });
+
+describe("IdentitySection account privacy for every provider", () => {
+  it("masks the account email of non-OpenAI providers when privacy is enabled", () => {
+    render(
+      <IdentitySection
+        provider={detail({ id: "codex", displayName: "Codex", email: "person@example.com", organization: null, plan: "Pro" })}
+        subtitle=""
+        t={t}
+        hidePersonalInfo
+      />,
+    );
+
+    expect(screen.getByText("p•••••@example.com")).toBeInTheDocument();
+    expect(screen.queryByText("person@example.com")).toBeNull();
+    expect(screen.getByText("Pro")).toBeInTheDocument();
+  });
+
+  it("masks an email embedded in the organization label", () => {
+    render(
+      <IdentitySection
+        provider={detail({ id: "claude", displayName: "Claude", email: null, organization: "person@example.com's Organization", plan: null })}
+        subtitle=""
+        t={t}
+        hidePersonalInfo
+      />,
+    );
+
+    expect(screen.getByText("p•••••@example.com's Organization")).toBeInTheDocument();
+  });
+
+  it("shows the account email when privacy is disabled", () => {
+    render(
+      <IdentitySection
+        provider={detail({ id: "codex", displayName: "Codex", email: "person@example.com", organization: null, plan: null })}
+        subtitle=""
+        t={t}
+      />,
+    );
+
+    expect(screen.getByText("person@example.com")).toBeInTheDocument();
+  });
+});

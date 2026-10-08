@@ -116,6 +116,10 @@ pub(super) struct WebReading {
 
 /// One dev.meta.ai GET. The transport is a trait so the request budget and
 /// session handling are testable without a network.
+#[allow(
+    clippy::double_must_use,
+    reason = "async-trait marks its boxed futures #[must_use]"
+)]
 #[async_trait]
 trait DevMetaApi: Send + Sync {
     async fn get(&self, path: &str, session_cookie: &str) -> Result<DevMetaResponse, Abort>;

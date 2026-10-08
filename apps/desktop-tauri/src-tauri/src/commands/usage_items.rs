@@ -2,6 +2,8 @@
 
 use super::{ProviderUsageSnapshot, Settings};
 use codexbar::core::{PersonalInfoRedactor, ProviderId};
+use codexbar::locale::{self, LocaleKey};
+use codexbar::settings::Language;
 use serde::{Deserialize, Serialize};
 
 /// Presentation descriptor for one quota metric or provider-emitted extra
@@ -34,7 +36,7 @@ fn redacted_usage_item_title(title: &str, settings: &Settings) -> String {
 /// Title shown for a persisted row the current snapshot no longer emits.
 /// The special cases cover the metric lanes and the two legacy extra rows;
 /// everything else falls back to title-casing the raw ID suffix.
-fn unavailable_usage_item_title(id: &str) -> String {
+fn unavailable_usage_item_title(id: &str, lang: Language) -> String {
     let raw = id
         .strip_prefix(codexbar::settings::USAGE_ITEM_METRIC_PREFIX)
         .unwrap_or(id);
@@ -42,10 +44,10 @@ fn unavailable_usage_item_title(id: &str) -> String {
         "extra-codex-spark" => "Codex Spark".to_string(),
         "extra-codex-spark-weekly" => "Codex Spark Weekly".to_string(),
         "extra-claude-routines" => "Daily Routines".to_string(),
-        "primary" => "Session".to_string(),
-        "secondary" => "Weekly".to_string(),
-        "model-specific" => "Model-specific".to_string(),
-        "tertiary" => "Tertiary".to_string(),
+        "primary" => locale::get_text(lang, LocaleKey::ProviderSessionLabel),
+        "secondary" => locale::get_text(lang, LocaleKey::ProviderWeeklyLabel),
+        "model-specific" => locale::get_text(lang, LocaleKey::DetailWindowModelSpecific),
+        "tertiary" => locale::get_text(lang, LocaleKey::DetailWindowTertiary),
         _ => raw
             .strip_prefix("extra-")
             .unwrap_or(raw)
@@ -62,9 +64,9 @@ fn unavailable_usage_item_title(id: &str) -> String {
             .join(" "),
     };
     if label.is_empty() {
-        "Usage item".to_string()
+        locale::get_text(lang, LocaleKey::UsageItemFallbackTitle)
     } else {
-        format!("{label} (unavailable)")
+        locale::format_locale(lang, LocaleKey::UsageItemUnavailableTitle, &[&label])
     }
 }
 
@@ -78,6 +80,7 @@ pub(crate) fn usage_item_descriptors(
     provider_id: ProviderId,
 ) -> Vec<ProviderUsageItemSnapshot> {
     let hidden = settings.hidden_usage_item_ids(provider_id);
+    let lang = settings.ui_language;
     let mut seen = std::collections::HashSet::new();
     let mut items = Vec::new();
 
@@ -134,7 +137,7 @@ pub(crate) fn usage_item_descriptors(
             let item_title = if available {
                 redacted_usage_item_title(title, settings)
             } else {
-                redacted_usage_item_title(&unavailable_usage_item_title(&id), settings)
+                redacted_usage_item_title(&unavailable_usage_item_title(&id, lang), settings)
             };
             items.push(ProviderUsageItemSnapshot {
                 id,
@@ -145,25 +148,29 @@ pub(crate) fn usage_item_descriptors(
     };
 
     if let Some(snapshot) = snapshot {
+        let session = locale::get_text(lang, LocaleKey::ProviderSessionLabel);
         push(
             "primary",
-            snapshot.primary_label.as_deref().unwrap_or("Session"),
+            snapshot.primary_label.as_deref().unwrap_or(&session),
             true,
         );
         if snapshot.secondary.is_some() {
+            let weekly = locale::get_text(lang, LocaleKey::ProviderWeeklyLabel);
             push(
                 "secondary",
-                snapshot.secondary_label.as_deref().unwrap_or("Weekly"),
+                snapshot.secondary_label.as_deref().unwrap_or(&weekly),
                 true,
             );
         }
         if snapshot.model_specific.is_some() {
-            push("model-specific", "Model-specific", true);
+            let model = locale::get_text(lang, LocaleKey::DetailWindowModelSpecific);
+            push("model-specific", &model, true);
         }
         if snapshot.tertiary.is_some() {
+            let tertiary = locale::get_text(lang, LocaleKey::DetailWindowTertiary);
             push(
                 "tertiary",
-                snapshot.tertiary_label.as_deref().unwrap_or("Tertiary"),
+                snapshot.tertiary_label.as_deref().unwrap_or(&tertiary),
                 true,
             );
         }
@@ -192,20 +199,32 @@ mod tests {
     #[test]
     fn unavailable_titles_cover_metric_lanes_and_legacy_rows() {
         assert_eq!(
-            unavailable_usage_item_title("metric:primary"),
+            unavailable_usage_item_title("metric:primary", Language::English),
             "Session (unavailable)"
         );
         assert_eq!(
-            unavailable_usage_item_title("metric:extra-codex-spark"),
+            unavailable_usage_item_title("metric:extra-codex-spark", Language::English),
             "Codex Spark (unavailable)"
         );
         assert_eq!(
-            unavailable_usage_item_title("metric:extra-claude-routines"),
+            unavailable_usage_item_title("metric:extra-claude-routines", Language::English),
             "Daily Routines (unavailable)"
         );
         assert_eq!(
-            unavailable_usage_item_title("metric:extra-new-row"),
+            unavailable_usage_item_title("metric:extra-new-row", Language::English),
             "New Row (unavailable)"
+        );
+    }
+
+    #[test]
+    fn unavailable_titles_follow_the_ui_language() {
+        assert_eq!(
+            unavailable_usage_item_title("metric:secondary", Language::Russian),
+            "Еженедельно (недоступно)"
+        );
+        assert_eq!(
+            unavailable_usage_item_title("metric:", Language::Japanese),
+            "使用量項目"
         );
     }
 }

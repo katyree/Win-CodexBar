@@ -1,5 +1,6 @@
 import type { LocaleKey } from "../i18n/keys";
 import type { ProviderDisplayDetail } from "../types/bridge";
+import { localizeProviderText } from "./providerText";
 
 type Translate = (key: LocaleKey) => string;
 
@@ -25,5 +26,5 @@ export function providerCostPeriodTitle(
   t: Translate,
 ): string {
   const key = COST_PERIOD_KEYS.get(`${providerId}:${period}`);
-  return key ? t(key) : period;
+  return key ? t(key) : localizeProviderText(period, t);
 }

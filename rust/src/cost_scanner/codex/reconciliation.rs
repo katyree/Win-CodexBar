@@ -12,10 +12,12 @@ pub(super) fn paused_codex_summary(
         return summary;
     }
 
+    // Without a retained report, rebuild one for the requested days only; the
+    // cache can hold days outside this window (#755: Today showed 30d totals).
     let report = cache
         .previous_report
         .clone()
-        .unwrap_or_else(|| JsonlScanner::cached_cost_report_from_days(cache));
+        .unwrap_or_else(|| JsonlScanner::cached_cost_report_for_range(cache, range));
     summary_from_cached_report(&report, start_date, today)
 }
 

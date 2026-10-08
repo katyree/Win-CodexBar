@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useState } from "react";
 import type {
   CostSummaryDisplayStyle,
   ProviderChartData,
@@ -18,6 +18,7 @@ import { DEEPSEEK_PRICING_EVENT } from "../hooks/useDeepSeekPricingStatus";
 import { getDeepSeekPricingStatus } from "../lib/tauri";
 import type { DeepSeekPricingStatus } from "../types/bridge";
 import { isUsageItemVisible } from "../lib/usageItemVisibility";
+import { localizeWindowLabel } from "../lib/windowLabels";
 import { useMonthlyLimitBlockNow } from "../hooks/useMonthlyLimitBlockNow";
 
 /** Small copy-to-clipboard button matching macOS CopyIconButton (doc.on.doc → checkmark). */
@@ -75,38 +76,6 @@ export function maskEmail(email: string): string {
   const at = email.indexOf("@");
   if (at <= 1) return "••••@••••";
   return email[0] + "•".repeat(at - 1) + email.slice(at);
-}
-
-/** Localize raw provider window labels using the active locale. */
-function localizeWindowLabel(
-  raw: string | undefined,
-  t: (key: LocaleKey) => string,
-  language?: string,
-  windowMinutes?: number | null,
-  windowId?: string,
-): string {
-  const normalized = raw?.trim().toLowerCase();
-  if (windowId?.startsWith("claude-weekly-scoped-")) {
-    const modelName = raw?.trim().replace(/\s+only\s*$/i, "").trim();
-    const template = t("ClaudeScopedWeeklyLabel");
-    return modelName ? template.replace("{}", modelName) : template.replace("{}", "");
-  }
-  // Upstream 0.55.0 #3070: quota windows in Simplified Chinese use their
-  // actual duration instead of the conversational Session wording.
-  if (language === "chinese" && normalized === "session" && windowMinutes != null) {
-    if (windowMinutes === 7 * 24 * 60) return t("ProviderWeeklyLabel");
-    if (windowMinutes >= 60 && windowMinutes <= 12 * 60 && windowMinutes % 60 === 0) {
-      return `${windowMinutes / 60} 小时`;
-    }
-  }
-  if (normalized === "weekly") {
-    return t("ProviderWeeklyLabel");
-  }
-  // F5 (upstream 0.48.0): monthly (30-day) window label.
-  if (normalized === "monthly") {
-    return t("ProviderMonthly");
-  }
-  return raw ?? "";
 }
 
 function displayPlanName(
@@ -275,53 +244,62 @@ export default function MenuCard({
     .filter(Boolean)
     .join(" ");
 
+  const renderHeader = (refreshAction?: ReactNode) => (
+    <header className="menu-card__header">
+      <div className="menu-card__title-row">
+        <div className="menu-card__name-group">
+          <span className="menu-card__name">{provider.displayName}</span>
+          {!provider.error && email && <span className="menu-card__email">{email}</span>}
+        </div>
+        {refreshAction}
+      </div>
+      {provider.error ? (
+        <div className="menu-card__error-block">
+          <div className="menu-card__error-text">{provider.error}</div>
+          <CopyIconButton text={provider.error} />
+        </div>
+      ) : (
+        <div className="menu-card__subtitle-row">
+          <span className="menu-card__subtitle">
+            {Number.isNaN(Date.parse(provider.updatedAt))
+              ? provider.updatedAt
+              : formatRelativeUpdated(Date.parse(provider.updatedAt), t)}
+          </span>
+          {displayedPlanName && (
+            <span className="menu-card__plan-badge">{displayedPlanName}</span>
+          )}
+        </div>
+      )}
+    </header>
+  );
+
   return (
     <article
       className={cardClassName}
       aria-busy={isRefreshing}
       style={accentColor ? ({ "--provider-accent": accentColor } as CSSProperties) : undefined}
     >
-      <header className="menu-card__header">
-        <div className="menu-card__title-row">
-          <div className="menu-card__name-group">
-            <span className="menu-card__name">{provider.displayName}</span>
-            {!provider.error && email && <span className="menu-card__email">{email}</span>}
-          </div>
-        </div>
-        {provider.error ? (
-          <div className="menu-card__error-block">
-            <div className="menu-card__error-text">{provider.error}</div>
-            <CopyIconButton text={provider.error} />
-          </div>
-        ) : (
-          <div className="menu-card__subtitle-row">
-            <span className="menu-card__subtitle">
-              {Number.isNaN(Date.parse(provider.updatedAt))
-                ? provider.updatedAt
-                : formatRelativeUpdated(Date.parse(provider.updatedAt), t)}
-            </span>
-            {displayedPlanName && (
-              <span className="menu-card__plan-badge">{displayedPlanName}</span>
-            )}
-          </div>
-        )}
-      </header>
+      {provider.providerId !== "grok" && renderHeader()}
 
       {provider.providerId === "codex" && (
         <CodexAccountsMenu
+          needsAuthentication={provider.errorState === "needsAuthentication"}
+          showAsUsed={showAsUsed}
           hideEmail={hideEmail}
           resetTimeRelative={resetTimeRelative}
           onLayoutChange={onLayoutChange}
         />
       )}
       {provider.providerId === "claude" && (
-        <ClaudeAccountsMenu hideEmail={hideEmail} onLayoutChange={onLayoutChange} />
+        <ClaudeAccountsMenu hideEmail={hideEmail} onLayoutChange={onLayoutChange} showAsUsed={showAsUsed} resetTimeRelative={resetTimeRelative} />
       )}
       {provider.providerId === "grok" && (
         <GrokAccountsMenu
           hideEmail={hideEmail}
           resetTimeRelative={resetTimeRelative}
           onLayoutChange={onLayoutChange}
+          cardSnapshot={provider}
+          renderHeader={renderHeader}
         />
       )}
 

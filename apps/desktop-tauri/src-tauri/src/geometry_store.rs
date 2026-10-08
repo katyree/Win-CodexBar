@@ -3,11 +3,11 @@
 //! Remembers position (and size where applicable) for detached user surfaces:
 //! PopOut and Settings.
 //!
-//! The flyout window stays computed from the tray anchor/work-area because it
-//! is a temporary anchored panel, not a user-movable standalone window — but
-//! its SIZE is remembered via the size-only [`StoredSize`] entries below, kept
-//! separate from [`StoredGeometry`] so the flyout's persisted size can never
-//! carry fabricated `x`/`y` coordinates.
+//! The flyout window is anchored to the tray until the user drags it; only
+//! then is its position stored (`shell::flyout_placement`). Its SIZE is
+//! remembered via the size-only [`StoredSize`] entries below, kept separate
+//! from [`StoredGeometry`] so a resize of a tray-anchored flyout never carries
+//! fabricated `x`/`y` coordinates.
 
 use std::fs;
 use std::path::PathBuf;
@@ -149,6 +149,18 @@ pub fn save_entry(key: &str, geometry: StoredGeometry) {
     let mut file = load_file();
     file.version = GEOMETRY_VERSION;
     file.entries.insert(key.to_string(), geometry);
+    if let Err(err) = save_file(&file) {
+        tracing::warn!(target: "codexbar::geometry", %err, "failed to persist geometry");
+    }
+}
+
+/// Forget the geometry stored under an arbitrary key. No-op (and no write)
+/// when nothing is stored there.
+pub fn remove_entry(key: &str) {
+    let mut file = load_file();
+    if file.entries.remove(key).is_none() {
+        return;
+    }
     if let Err(err) = save_file(&file) {
         tracing::warn!(target: "codexbar::geometry", %err, "failed to persist geometry");
     }

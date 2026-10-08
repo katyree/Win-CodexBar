@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ProviderDetail, SettingsUpdate } from "../../../../types/bridge";
 import type { LocaleKey } from "../../../../i18n/keys";
+import { localizeWindowLabel } from "../../../../lib/windowLabels";
 
 interface Props {
   provider: ProviderDetail;
@@ -66,7 +67,9 @@ export function UsageItemVisibilitySection({
             onChange={(event) => toggle(item.id, event.target.checked)}
           />
           <span>
-            <span className="provider-detail-toggle__label">{item.title}</span>
+            <span className="provider-detail-toggle__label">
+              {item.available ? localizeWindowLabel(item.title, t) || item.title : item.title}
+            </span>
             {!item.available && (
               <span className="provider-detail-toggle__helper">
                 {t("ProviderUsageNotFetchedYet")}

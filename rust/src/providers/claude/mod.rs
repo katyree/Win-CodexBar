@@ -95,6 +95,13 @@ fn cached_cli_result() -> Option<ProviderFetchResult> {
 fn is_oauth_revoked_error(error: &ProviderError) -> bool {
     matches!(error, ProviderError::OAuthRevoked(_))
 }
+
+/// OAuth failures after which Auto reuses a cached CLI result instead of
+/// probing the CLI again: a revocation, or a 429 (the OAuth fetcher then
+/// backs off for minutes and every poll would otherwise wait on the probe).
+fn oauth_failure_uses_cli_cache(error: &ProviderError) -> bool {
+    is_oauth_revoked_error(error) || oauth::is_rate_limited_error(error)
+}
 pub use oauth::ClaudeOAuthFetcher;
 pub use web_api::ClaudeWebApiFetcher;
 
@@ -902,18 +909,21 @@ impl ClaudeProvider {
 
         // Upstream 0.50.1 #2516: track whether OAuth failed with a revocation.
         let oauth_result = self.fetch_via_oauth(ctx).await;
-        let oauth_revoked = oauth_result
+        let use_cli_cache = oauth_result
             .as_ref()
             .err()
-            .is_some_and(is_oauth_revoked_error);
+            .is_some_and(oauth_failure_uses_cli_cache);
         if let Some(result) = record_auto_source(&mut failures, "OAuth", oauth_result)? {
             return Ok(result);
         }
 
-        // When OAuth was revoked (not just expired), reuse a cached CLI result
-        // if still within the 15-minute TTL to avoid re-probing the CLI.
-        if oauth_revoked && let Some(cached) = cached_cli_result() {
-            tracing::debug!("Claude OAuth revoked; returning cached CLI result (15-min cache)");
+        // When OAuth was revoked (not just expired) or is rate limited, reuse a
+        // cached CLI result if still within the 15-minute TTL to avoid
+        // re-probing the CLI.
+        if use_cli_cache && let Some(cached) = cached_cli_result() {
+            tracing::debug!(
+                "Claude OAuth revoked or rate limited; returning cached CLI result (15-min cache)"
+            );
             return Ok(cached);
         }
 
@@ -925,9 +935,9 @@ impl ClaudeProvider {
             if !claude_code_consent() {
                 result.source_label = "cli (reduced fidelity)".to_string();
             }
-            // Cache the CLI result when OAuth was revoked so subsequent polls
-            // within the TTL reuse it without re-probing.
-            if oauth_revoked {
+            // Cache the CLI result when OAuth was revoked or rate limited so
+            // subsequent polls within the TTL reuse it without re-probing.
+            if use_cli_cache {
                 cache_cli_result(result.clone());
             }
             return Ok(result);
@@ -2443,6 +2453,27 @@ Usage:                 0 input, 0 output, 0 cache read
             "expired".to_string()
         )));
         assert!(!is_oauth_revoked_error(&ProviderError::AuthRequired));
+    }
+
+    #[test]
+    fn rate_limited_and_revoked_oauth_reuse_the_cli_cache() {
+        let rate_limited = ProviderError::OAuthTransient(
+            "Claude OAuth usage endpoint is rate limited. Retrying in about 5m; credentials were preserved."
+                .to_string(),
+        );
+        assert!(oauth::is_rate_limited_error(&rate_limited));
+        assert!(oauth_failure_uses_cli_cache(&rate_limited));
+        assert!(oauth_failure_uses_cli_cache(&ProviderError::OAuthRevoked(
+            "revoked".to_string()
+        )));
+        // Other transient failures and plain expiry still probe the CLI.
+        assert!(!oauth_failure_uses_cli_cache(
+            &ProviderError::OAuthTransient("connection reset".to_string())
+        ));
+        assert!(!oauth_failure_uses_cli_cache(&ProviderError::OAuth(
+            "expired".to_string()
+        )));
+        assert!(!oauth_failure_uses_cli_cache(&ProviderError::AuthRequired));
     }
 
     #[test]

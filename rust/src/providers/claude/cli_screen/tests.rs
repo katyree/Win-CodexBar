@@ -36,6 +36,15 @@ fn cursor_and_erase_operations_preserve_visible_cells() {
         ("abc\nxyz\u{1b}[1;2H\u{1b}[J", "a"),
         ("abc\nxyz\u{1b}[2;2H\u{1b}[1J", "\n  z"),
         ("abc\nxyz\u{1b}[2JQ", "\n   Q"),
+        ("abcdef\r\u{1b}[2C\u{1b}[2XZ", "abZ ef"),
+        ("abc\r\u{1b}[XZ", "Zbc"),
+        ("abc\u{1b}[2G\u{1b}[99X", "a"),
+        ("中文x\r\u{1b}[1C\u{1b}[1X", "  文x"),
+        // A ConPTY redraw over an earlier frame's row: ECH blanks the gaps.
+        (
+            "ResetsiOctr6, 4am\rResets\u{1b}[1X\u{1b}[1COct\u{1b}[1X\u{1b}[1C6, 4am",
+            "Resets Oct 6, 4am",
+        ),
         ("a\u{1b}[38;5;42mb\u{1b}[0m\u{1b}[?25lc", "abc"),
         ("a\u{1b}]0;hidden\u{7}b\u{1b}]8;;hidden\u{1b}\\c", "abc"),
         ("a\u{1b}]0;hidden", "a"),

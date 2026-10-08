@@ -256,7 +256,7 @@ impl Screen {
         let Some(command) = sequence.chars().next_back() else {
             return false;
         };
-        if !"ABCDGHfKJ".contains(command) {
+        if !"ABCDGHfKJX".contains(command) {
             return false;
         }
         let parameters = &sequence[..sequence.len() - command.len_utf8()];
@@ -289,6 +289,14 @@ impl Screen {
                 self.row = (ROWS - 1).min(amount - 1);
                 let column = values.get(1).copied().unwrap_or(0).max(1);
                 self.column = (COLUMNS - 1).min(column - 1);
+            }
+            // `ECH`: blank `amount` cells from the cursor without moving it.
+            // ConPTY redraws rows with it, so ignoring it leaves the previous
+            // frame's characters between words.
+            'X' => {
+                for column in self.column..(self.column + amount).min(COLUMNS) {
+                    self.clear_cell(self.row, column);
+                }
             }
             _ => self.erase(command == 'K', mode),
         }

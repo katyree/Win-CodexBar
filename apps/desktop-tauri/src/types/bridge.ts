@@ -1230,6 +1230,7 @@ export interface CodexAccountsStateBridge {
   /** Canonical opaque account ordinals, keyed by stable account id. */
   accountOrdinals: Record<string, number>;
   snapshots: Record<string, CodexAccountUsageSnapshot>;
+  needsAuthentication?: Record<string, boolean>;
 }
 export interface ClaudeAccount {
   id: string;
@@ -1238,6 +1239,13 @@ export interface ClaudeAccount {
   plan: string | null;
   isActive: boolean;
   isSaved: boolean;
+  usage?: {
+    fiveHour: { usedPercent: number; resetsAt: string | null } | null;
+    sevenDay: { usedPercent: number; resetsAt: string | null } | null;
+    updatedAt: string;
+  } | null;
+  usageError?: string | null;
+  needsAuthentication?: boolean;
 }
 
 export interface ClaudeReconciliationSnapshot {
@@ -1257,6 +1265,7 @@ export interface GrokAccount {
 }
 
 export interface GrokAccountUsage {
+  status?: "loading" | "ready" | "signInRequired" | "unavailable" | "failed";
   usageAvailable: boolean;
   usedPercent: number | null;
   plan: string | null;

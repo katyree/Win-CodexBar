@@ -72,7 +72,11 @@ describe("UsageSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tauriMocks.getLocaleStrings.mockResolvedValue(
-      buildBundle({ InventoryAvailableCount: "{} available" }),
+      buildBundle({
+        InventoryAvailableCount: "{} available",
+        ProviderLabelLimitResetCredits: "Limit reset credits",
+        ProviderTextTokens: "{} tokens",
+      }),
     );
     eventMocks.listen.mockResolvedValue(() => {});
   });
@@ -167,7 +171,7 @@ describe("UsageSection", () => {
     );
 
     const label = await screen.findByText("ProviderSessionLabel");
-    expect(label.parentElement).toHaveTextContent("No active 5h session");
+    expect(label.parentElement).toHaveTextContent("ProviderTextNoActiveSession");
     expect(label.parentElement?.querySelector(".provider-usage-bar__track")).toBeNull();
   });
 
@@ -261,8 +265,8 @@ describe("UsageSection", () => {
   it("shows provider-declared lane labels in settings bars", async () => {
     const detail = provider();
     detail.weekly = rateWindow(30);
-    detail.primaryLabel = "Personal budget";
-    detail.secondaryLabel = "Team budget";
+    detail.primaryLabel = "Fuel Pack";
+    detail.secondaryLabel = "Gemini Pro";
 
     render(
       <LocaleProvider>
@@ -270,8 +274,8 @@ describe("UsageSection", () => {
       </LocaleProvider>,
     );
 
-    expect(await screen.findByText("Personal budget")).toBeInTheDocument();
-    expect(screen.getByText("Team budget")).toBeInTheDocument();
+    expect(await screen.findByText("Fuel Pack")).toBeInTheDocument();
+    expect(screen.getByText("Gemini Pro")).toBeInTheDocument();
     expect(screen.queryByText("ProviderSessionLabel")).not.toBeInTheDocument();
     expect(screen.queryByText("ProviderWeeklyLabel")).not.toBeInTheDocument();
   });

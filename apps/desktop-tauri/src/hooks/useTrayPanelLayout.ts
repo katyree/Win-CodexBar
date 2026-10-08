@@ -41,8 +41,8 @@ export interface TrayPanelLayoutOptions {
   layoutKey: string;
   /** Auto-fit the window to its content (until the user sets a size). */
   autoFit?: boolean;
-  /** The user's remembered size, re-applied + re-anchored each time the flyout
-   *  opens. `null` when the user has not resized yet. */
+  /** The user's remembered size in logical px, re-applied + re-anchored each
+   *  time the flyout opens. `null` when the user has not resized yet. */
   fixedSize?: [number, number] | null;
   /** Whether the flyout is currently open (surface mode === trayPanel). Used as
    *  the "just opened" trigger for the fixed-size restore + re-anchor. */
@@ -119,12 +119,26 @@ export function useTrayPanelLayout({
   // Report genuine user drag-resizes. Ignore resizes that fire while WE are
   // resizing (in-flight counter) or whose physical size still matches the last
   // size we applied; anything else is the user dragging the border. Everything
-  // is in PHYSICAL pixels — no scale conversion, so it can't drift.
+  // is in PHYSICAL pixels — no scale conversion, so it can't drift. A DPI change
+  // (the panel moved onto a monitor with other scaling) announces its rescaled
+  // size first; adopting it keeps that rescale from counting as a user resize,
+  // which would freeze an auto-fit panel at a fixed size.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let unlistenScale: (() => void) | undefined;
     let cancelled = false;
     const win = getCurrentWindow();
     void (async () => {
+      try {
+        unlistenScale = await win.onScaleChanged(({ payload }) => {
+          lastSizeRef.current = {
+            width: payload.size.width,
+            height: payload.size.height,
+          };
+        });
+      } catch {
+        unlistenScale = undefined;
+      }
       try {
         unlisten = await win.onResized(({ payload }) => {
           if (programmaticInFlightRef.current > 0) return;
@@ -141,11 +155,15 @@ export function useTrayPanelLayout({
       } catch {
         unlisten = undefined;
       }
-      if (cancelled) unlisten?.();
+      if (cancelled) {
+        unlisten?.();
+        unlistenScale?.();
+      }
     })();
     return () => {
       cancelled = true;
       unlisten?.();
+      unlistenScale?.();
     };
   }, []);
 
@@ -159,8 +177,9 @@ export function useTrayPanelLayout({
     if (!fixed) return;
     let cancelled = false;
     void (async () => {
-      // `fixed` is the user's remembered PHYSICAL size (scale-independent).
-      await applySize(new PhysicalSize(fixed[0], fixed[1]));
+      // `fixed` is the user's remembered LOGICAL size; the window converts it
+      // with the DPI of the monitor it is on now.
+      await applySize(new LogicalSize(fixed[0], fixed[1]));
       await Promise.resolve(reanchorTrayPanel()).catch(() => {});
       if (cancelled) return;
       layoutReadyRef.current = true;
