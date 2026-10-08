@@ -11,6 +11,7 @@ pub mod quota_history;
 mod reset_credits;
 pub mod reset_observations;
 mod scoped_weekly;
+mod trust_dialog;
 mod web_api;
 
 use async_trait::async_trait;
@@ -484,7 +485,9 @@ fn javascript_hash_base36(text: &str) -> String {
 fn claude_usage_settings_args() -> [String; 2] {
     [
         "--settings".to_string(),
-        r#"{"remoteControlAtStartup":false}"#.to_string(),
+        // Issue #778 (Claude Code 2.1.293): `tui: default` stops the "Try the new
+        // fullscreen renderer?" offer. Older builds ignore unknown settings keys.
+        r#"{"remoteControlAtStartup":false,"tui":"default"}"#.to_string(),
     ]
 }
 
@@ -507,7 +510,7 @@ struct ClaudePtyProbeOptions {
     initial_delay_secs: f64,
     script_char_delay_secs: f64,
     script_line_delay_secs: f64,
-    send_on_substring: Option<(&'static str, &'static str)>,
+    screen_responder: Option<crate::cli::tty_responder::ScreenResponder>,
     /// Re-type the script at these offsets while no done marker is visible.
     script_retry_delays_secs: &'static [f64],
     script_done_substrings: &'static [&'static str],
@@ -549,7 +552,7 @@ async fn run_claude_usage_pty_probe(
             initial_delay_secs: 3.0,
             script_char_delay_secs: 0.04,
             script_line_delay_secs: 0.0,
-            send_on_substring: None,
+            screen_responder: None,
             script_retry_delays_secs: CLAUDE_USAGE_RETRY_DELAYS_SECS,
             script_done_substrings: CLAUDE_USAGE_DONE_MARKERS,
             script_echo_substrings: CLAUDE_USAGE_ECHO_MARKERS,
@@ -574,7 +577,7 @@ async fn run_claude_trust_preflight(
             initial_delay_secs: 0.6,
             script_char_delay_secs: 0.0,
             script_line_delay_secs: 0.0,
-            send_on_substring: Some(("Enter", "\n/exit\n")),
+            screen_responder: Some(trust_dialog::TRUST_RESPONDER),
             script_retry_delays_secs: &[],
             script_done_substrings: &[],
             script_echo_substrings: &[],
@@ -680,6 +683,10 @@ fn claude_passive_probe_env(
     // Passive status/usage probes must not mutate or update the user's Claude CLI installation.
     base.insert("NO_COLOR".to_string(), "1".to_string());
     base.insert("DISABLE_AUTOUPDATER".to_string(), "1".to_string());
+    // Issue #778 (Claude Code 2.1.293): stops the "Claude in Chrome extension
+    // detected" offer, which would swallow `/usage`. Claude Code reads this
+    // variable; older builds ignore it. Probe launch only; config is untouched.
+    base.insert("CLAUDE_CODE_ENABLE_CFC".to_string(), "0".to_string());
     base
 }
 
@@ -712,8 +719,8 @@ async fn run_claude_pty_probe(
             if let Some(idle) = probe.idle_timeout_after_done_secs {
                 options = options.with_idle_timeout_after_done(idle);
             }
-            if let Some((trigger, keys)) = probe.send_on_substring {
-                options = options.with_send_on_substring(trigger, keys);
+            if let Some(responder) = probe.screen_responder {
+                options = options.with_screen_responder(responder);
             }
             if !probe.script_retry_delays_secs.is_empty() {
                 options = options.with_script_retries(
@@ -1777,6 +1784,19 @@ mod tests {
     }
 
     #[test]
+    fn probe_avoids_chrome_and_fullscreen_startup_dialogs() {
+        let env = claude_passive_probe_env(HashMap::new());
+        assert_eq!(
+            env.get("CLAUDE_CODE_ENABLE_CFC").map(String::as_str),
+            Some("0")
+        );
+        let settings: serde_json::Value =
+            serde_json::from_str(&claude_usage_settings_args()[1]).unwrap();
+        assert_eq!(settings["tui"], "default");
+        assert_eq!(settings["remoteControlAtStartup"], false);
+    }
+
+    #[test]
     fn probe_session_id_is_reused_from_probe_directory() {
         let dir = tempfile::tempdir().unwrap();
         let first = load_or_create_probe_session_id(dir.path());
@@ -1802,7 +1822,7 @@ mod tests {
             claude_usage_settings_args(),
             [
                 "--settings".to_string(),
-                r#"{"remoteControlAtStartup":false}"#.to_string(),
+                r#"{"remoteControlAtStartup":false,"tui":"default"}"#.to_string(),
             ]
         );
     }

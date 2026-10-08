@@ -2312,14 +2312,14 @@ fn cookie_options_empty_for_providers_without_picker() {
 
 #[test]
 fn region_options_for_regional_provider() {
-    let opts = super::region_options_for("alibaba");
+    let opts = super::region_options_for("alibaba", Language::English);
     let values: Vec<_> = opts.iter().map(|o| o.value.as_str()).collect();
     assert_eq!(values, vec!["singapore", "us", "germany", "hongkong", "cn"]);
 }
 
 #[test]
 fn alibaba_token_plan_region_options() {
-    let opts = super::region_options_for("alibabatokenplan");
+    let opts = super::region_options_for("alibabatokenplan", Language::English);
     let values: Vec<_> = opts.iter().map(|o| o.value.as_str()).collect();
     let labels: Vec<_> = opts.iter().map(|o| o.label.as_str()).collect();
     assert_eq!(values, vec!["cn", "intl", "cn-personal", "intl-personal"]);
@@ -2336,7 +2336,7 @@ fn alibaba_token_plan_region_options() {
 
 #[test]
 fn minimax_region_options_match_upstream_hosts() {
-    let opts = super::region_options_for("minimax");
+    let opts = super::region_options_for("minimax", Language::English);
     let values: Vec<_> = opts.iter().map(|o| o.value.as_str()).collect();
     let labels: Vec<_> = opts.iter().map(|o| o.label.as_str()).collect();
     assert_eq!(values, vec!["global", "cn"]);
@@ -2351,15 +2351,96 @@ fn minimax_region_options_match_upstream_hosts() {
 
 #[test]
 fn kimi_region_options_match_regional_hosts() {
-    let opts = super::region_options_for("kimi");
+    let opts = super::region_options_for("kimi", Language::English);
     let values: Vec<_> = opts.iter().map(|option| option.value.as_str()).collect();
     assert_eq!(values, vec!["china", "international"]);
 }
 
 #[test]
+fn cookie_and_region_options_are_localized_for_every_provider() {
+    // Every description and region label must come from the locale catalog: none may stay
+    // English in another language, except the labels in ALLOWED_SAME_AS_ENGLISH, which the
+    // catalogs legitimately keep identical to the English text (proper names).
+    const ALLOWED_SAME_AS_ENGLISH: &[(Language, &str, &str)] = &[
+        (Language::Spanish, "kimi", "china"),
+        (Language::Spanish, "minimax", "global"),
+        (Language::Spanish, "zai", "global"),
+        (Language::PortugueseBrazil, "kimi", "china"),
+        (Language::PortugueseBrazil, "minimax", "global"),
+        (Language::PortugueseBrazil, "zai", "global"),
+    ];
+    for &lang in Language::all() {
+        if lang == Language::English {
+            continue;
+        }
+        for provider in codexbar::core::ProviderId::all() {
+            let id = provider.cli_name();
+            let en = super::cookie_source_options_for(id, Language::English);
+            let other = super::cookie_source_options_for(id, lang);
+            assert_eq!(en.len(), other.len(), "{lang:?} {id}");
+            for (en, other) in en.iter().zip(&other) {
+                if let Some(text) = &en.description {
+                    assert_ne!(
+                        Some(text),
+                        other.description.as_ref(),
+                        "{lang:?} {id} {} description",
+                        en.value
+                    );
+                }
+            }
+            let en = super::region_options_for(id, Language::English);
+            let other = super::region_options_for(id, lang);
+            assert_eq!(en.len(), other.len(), "{lang:?} {id} regions");
+            for (en, other) in en.iter().zip(&other) {
+                if ALLOWED_SAME_AS_ENGLISH.contains(&(lang, id, en.value.as_str())) {
+                    continue;
+                }
+                assert_ne!(en.label, other.label, "{lang:?} {id} region {}", en.value);
+            }
+        }
+    }
+}
+
+#[test]
+fn english_region_labels_match_the_provider_display_names() {
+    use codexbar::providers::{AlibabaRegion, AlibabaTokenPlanRegion, KimiRegion, MiniMaxRegion};
+    let labels = |id| {
+        super::region_options_for(id, Language::English)
+            .into_iter()
+            .map(|option| option.label)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        labels("alibaba"),
+        AlibabaRegion::ALL
+            .iter()
+            .map(|r| r.display_name())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        labels("alibabatokenplan"),
+        AlibabaTokenPlanRegion::ALL
+            .iter()
+            .map(|r| r.display_name())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        labels("kimi"),
+        KimiRegion::ALL
+            .iter()
+            .map(|r| r.display_name())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        labels("minimax"),
+        [MiniMaxRegion::Global, MiniMaxRegion::ChinaMainland].map(|r| r.display_name())
+    );
+}
+
+#[test]
 fn region_options_empty_for_non_regional_provider() {
-    assert!(super::region_options_for("claude").is_empty());
-    assert!(super::region_options_for("codex").is_empty());
+    assert!(super::region_options_for("claude", Language::English).is_empty());
+    assert!(super::region_options_for("codex", Language::English).is_empty());
 }
 
 #[test]

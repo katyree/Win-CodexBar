@@ -171,7 +171,7 @@ codexbar config validate
 
 `config providers`, `enable`, `disable` and `claude-code-credentials` accept `--format text|json`, `--json` and `--pretty`. Their JSON follows upstream:
 
-- `config providers`: one `{provider, displayName, enabled, defaultEnabled}` object per provider. The text lines are unchanged.
+- `config providers`: one `{provider, displayName, enabled, defaultEnabled}` object per provider. The text lines are unchanged. Retired providers (`kimik2`, `crossmodel`) are listed only while enabled, like the Settings UI; they still resolve by name (for example `--provider kimik2`).
 - `config enable` / `config disable`: `{provider, displayName, enabled, configPath}`.
 - `config claude-code-credentials allow|deny|status`: `{allowed, configPath}`.
 

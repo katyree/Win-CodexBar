@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,6 +22,7 @@ vi.mock("@tauri-apps/api/event", () => eventMocks);
 
 import { LocaleProvider } from "../i18n/LocaleProvider";
 import { buildBundle } from "../test/localeHarness";
+import { loadStyles, ruleBlock } from "../test/styles";
 import type { ProviderUsageSnapshot } from "../types/bridge";
 import MenuCard from "./MenuCard";
 
@@ -1125,19 +1125,7 @@ describe("MenuCard", () => {
 // The SwiftUI fix this regression came from protecting a cached native
 // measurement. The Windows card has no cached measurement layer: its live
 // forecast is a normal flex row whose width is recomputed by WebView2.
-if (!import.meta.dirname) {
-  throw new Error("import.meta.dirname unavailable to vitest runner");
-}
-const stylesSource = readFileSync(import.meta.dirname + "/../styles.css", "utf8");
-
-function ruleBlock(source: string, selector: string): string {
-  const escaped = selector.replace(/[^\w-]/g, "\\$&");
-  const match = source.match(
-    new RegExp("(?:^|\\r?\\n)" + escaped + "\\s*\\{([^}]*)\\}"),
-  );
-  expect(match).not.toBeNull();
-  return match![1];
-}
+const stylesSource = loadStyles();
 
 describe("MenuCard live forecast layout", () => {
   it("renders the changing forecast in the current full-width flex row", async () => {

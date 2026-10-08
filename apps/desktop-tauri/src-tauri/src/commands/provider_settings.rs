@@ -25,11 +25,11 @@ pub(crate) fn build_provider_summaries(settings: &Settings) -> Vec<ProviderSumma
         .iter()
         .filter_map(|id| {
             by_id.get(id).and_then(|p| {
-                let enabled = settings.enabled_providers.contains(id);
                 // Soft-removed providers (upstream #2254) stay hidden unless already enabled.
-                if p.is_deprecated() && !enabled {
+                if !settings.is_provider_listed(**p) {
                     return None;
                 }
+                let enabled = settings.is_provider_enabled(**p);
                 Some(ProviderSummary {
                     id: id.clone(),
                     display_name: p.display_name().to_string(),
@@ -334,7 +334,7 @@ pub(crate) fn provider_region_set(
 pub fn set_provider_region(provider_id: String, region: String) -> Result<(), String> {
     let region = region.trim();
     if region.is_empty()
-        || !region_options_for(&provider_id)
+        || !region_options_for(&provider_id, Language::English)
             .iter()
             .any(|option| option.value == region)
     {
@@ -605,33 +605,20 @@ pub struct RegionOption {
 fn cookie_option(
     lang: Language,
     value: &str,
-    auto_desc: impl Into<String>,
-    manual_desc: impl Into<String>,
-    off_desc: Option<&str>,
+    desc_key: Option<locale::LocaleKey>,
 ) -> CookieSourceOption {
-    let (label, description) = match value {
-        "auto" => (
-            locale::get_text(lang, locale::LocaleKey::Automatic),
-            auto_desc.into(),
-        ),
-        "manual" => (
-            locale::get_text(lang, locale::LocaleKey::CookieSourceManual),
-            manual_desc.into(),
-        ),
-        "off" => (
-            locale::get_text(lang, locale::LocaleKey::ProviderDisabled),
-            off_desc.unwrap_or("").to_string(),
-        ),
-        other => (other.to_string(), String::new()),
+    let label = match value {
+        "auto" => locale::get_text(lang, locale::LocaleKey::Automatic),
+        "manual" => locale::get_text(lang, locale::LocaleKey::CookieSourceManual),
+        "off" => locale::get_text(lang, locale::LocaleKey::ProviderDisabled),
+        other => other.to_string(),
     };
     CookieSourceOption {
         value: value.to_string(),
         label,
-        description: if description.is_empty() {
-            None
-        } else {
-            Some(description)
-        },
+        description: desc_key
+            .map(|key| locale::get_text(lang, key))
+            .filter(|text| !text.is_empty()),
     }
 }
 
@@ -644,393 +631,278 @@ pub fn cookie_source_options_for(provider_id: &str, lang: Language) -> Vec<Cooki
             cookie_option(
                 lang,
                 "auto",
-                locale::get_text(lang, locale::LocaleKey::ProviderCodexAutoImportHelp),
-                "Paste a Cookie header from a chatgpt.com request.",
-                Some("Disable OpenAI dashboard cookie usage."),
+                Some(locale::LocaleKey::ProviderCodexAutoImportHelp),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from a chatgpt.com request.",
-                None,
+                Some(locale::LocaleKey::CookieHelpCodexManual),
             ),
-            cookie_option(
-                lang,
-                "off",
-                "",
-                "",
-                Some("Disable OpenAI dashboard cookie usage."),
-            ),
+            cookie_option(lang, "off", Some(locale::LocaleKey::CookieHelpCodexOff)),
         ],
         "claude" => vec![
             cookie_option(
                 lang,
                 "auto",
-                locale::get_text(lang, locale::LocaleKey::ProviderClaudeCookiesHelp),
-                "",
-                None,
+                Some(locale::LocaleKey::ProviderClaudeCookiesHelp),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                locale::get_text(lang, locale::LocaleKey::ProviderClaudeCookiesHelp),
-                None,
+                Some(locale::LocaleKey::ProviderClaudeCookiesHelp),
             ),
         ],
         "cursor" => vec![
             cookie_option(
                 lang,
                 "auto",
-                locale::get_text(lang, locale::LocaleKey::ProviderCursorCookieSourceHelp),
-                "",
-                None,
+                Some(locale::LocaleKey::ProviderCursorCookieSourceHelp),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from a cursor.com request.",
-                None,
+                Some(locale::LocaleKey::CookieHelpCursorManual),
             ),
         ],
         "grok" => vec![
-            cookie_option(
-                lang,
-                "auto",
-                "Automatic imports grok.com browser cookies.",
-                "Paste a Cookie header from a grok.com request.",
-                Some("Grok browser cookies are disabled."),
-            ),
+            cookie_option(lang, "auto", Some(locale::LocaleKey::CookieHelpGrokAuto)),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from a grok.com request.",
-                None,
+                Some(locale::LocaleKey::CookieHelpGrokManual),
             ),
-            cookie_option(
-                lang,
-                "off",
-                "",
-                "",
-                Some("Grok browser cookies are disabled."),
-            ),
+            cookie_option(lang, "off", Some(locale::LocaleKey::CookieHelpGrokOff)),
         ],
         "opencode" => vec![
             cookie_option(
                 lang,
                 "auto",
-                "Automatic imports browser cookies from opencode.ai.",
-                "",
-                None,
+                Some(locale::LocaleKey::CookieHelpOpenCodeAuto),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from the billing page.",
-                None,
+                Some(locale::LocaleKey::CookieHelpOpenCodeManual),
             ),
         ],
         "factory" => vec![
-            cookie_option(
-                lang,
-                "auto",
-                "Automatic imports browser cookies and WorkOS sessions.",
-                "",
-                None,
-            ),
+            cookie_option(lang, "auto", Some(locale::LocaleKey::CookieHelpFactoryAuto)),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from Factory.",
-                None,
+                Some(locale::LocaleKey::CookieHelpFactoryManual),
             ),
         ],
         "alibaba" | "alibabatokenplan" => vec![
-            cookie_option(
-                lang,
-                "auto",
-                "Automatic imports browser cookies from Model Studio / Bailian.",
-                "",
-                None,
-            ),
+            cookie_option(lang, "auto", Some(locale::LocaleKey::CookieHelpAlibabaAuto)),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from Model Studio or Bailian.",
-                None,
+                Some(locale::LocaleKey::CookieHelpAlibabaManual),
             ),
         ],
         "kimi" | "kimik2" => vec![
-            cookie_option(lang, "auto", "Automatic imports browser cookies.", "", None),
-            cookie_option(
-                lang,
-                "manual",
-                "",
-                "Paste a cookie header or the kimi-auth token value.",
-                None,
-            ),
-            cookie_option(lang, "off", "", "", Some("Kimi cookies are disabled.")),
-        ],
-        "minimax" => vec![
             cookie_option(
                 lang,
                 "auto",
-                "Automatic imports browser cookies and Coding Plan tokens.",
-                "",
-                None,
+                Some(locale::LocaleKey::CookieHelpAutoBrowserCookies),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from the Coding Plan page.",
-                None,
+                Some(locale::LocaleKey::CookieHelpKimiManual),
+            ),
+            cookie_option(lang, "off", Some(locale::LocaleKey::CookieHelpKimiOff)),
+        ],
+        "minimax" => vec![
+            cookie_option(lang, "auto", Some(locale::LocaleKey::CookieHelpMiniMaxAuto)),
+            cookie_option(
+                lang,
+                "manual",
+                Some(locale::LocaleKey::CookieHelpMiniMaxManual),
             ),
         ],
         "augment" => vec![
-            cookie_option(lang, "auto", "Automatic imports browser cookies.", "", None),
+            cookie_option(
+                lang,
+                "auto",
+                Some(locale::LocaleKey::CookieHelpAutoBrowserCookies),
+            ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from the Augment dashboard.",
-                None,
+                Some(locale::LocaleKey::CookieHelpAugmentManual),
             ),
         ],
         "amp" => vec![
-            cookie_option(lang, "auto", "Automatic imports browser cookies.", "", None),
             cookie_option(
                 lang,
-                "manual",
-                "",
-                "Paste a Cookie header from Amp settings.",
-                None,
+                "auto",
+                Some(locale::LocaleKey::CookieHelpAutoBrowserCookies),
             ),
+            cookie_option(lang, "manual", Some(locale::LocaleKey::CookieHelpAmpManual)),
         ],
         "ollama" => vec![
-            cookie_option(lang, "auto", "Automatic imports browser cookies.", "", None),
+            cookie_option(
+                lang,
+                "auto",
+                Some(locale::LocaleKey::CookieHelpAutoBrowserCookies),
+            ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from Ollama settings.",
-                None,
+                Some(locale::LocaleKey::CookieHelpOllamaManual),
             ),
         ],
         "mistral" => vec![
-            cookie_option(
-                lang,
-                "auto",
-                "Automatic imports browser cookies from Mistral Admin.",
-                "",
-                None,
-            ),
+            cookie_option(lang, "auto", Some(locale::LocaleKey::CookieHelpMistralAuto)),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from admin.mistral.ai.",
-                None,
+                Some(locale::LocaleKey::CookieHelpMistralManual),
             ),
         ],
         "notion" => vec![
-            cookie_option(
-                lang,
-                "auto",
-                "Automatically imports the browser session cookie.",
-                "",
-                None,
-            ),
+            cookie_option(lang, "auto", Some(locale::LocaleKey::CookieHelpNotionAuto)),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a full cookie header or the token_v2 value.",
-                None,
+                Some(locale::LocaleKey::CookieHelpNotionManual),
             ),
-            cookie_option(lang, "off", "", "", Some("Notion cookies are disabled.")),
+            cookie_option(lang, "off", Some(locale::LocaleKey::CookieHelpNotionOff)),
         ],
         "muse" => vec![
-            cookie_option(
-                lang,
-                "auto",
-                "Reads the selected team's quota with the signed-in dev.meta.ai browser session.",
-                "",
-                None,
-            ),
+            cookie_option(lang, "auto", Some(locale::LocaleKey::CookieHelpMuseAuto)),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste the llama_dev_sess cookie from dev.meta.ai. Nothing is read until you paste one.",
-                None,
+                Some(locale::LocaleKey::CookieHelpMuseManual),
             ),
-            cookie_option(
-                lang,
-                "off",
-                "",
-                "",
-                Some("Browser sessions are never read for Muse Code."),
-            ),
+            cookie_option(lang, "off", Some(locale::LocaleKey::CookieHelpMuseOff)),
         ],
         "replicate" => vec![
             cookie_option(
                 lang,
                 "auto",
-                "Automatic imports the signed-in replicate.com browser session.",
-                "Paste a Cookie header from the Replicate billing page.",
-                None,
+                Some(locale::LocaleKey::CookieHelpReplicateAuto),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from https://replicate.com/account/billing.",
-                None,
+                Some(locale::LocaleKey::CookieHelpReplicateManual),
             ),
         ],
         "raycast" => vec![
             cookie_option(
                 lang,
                 "auto",
-                locale::get_text(lang, locale::LocaleKey::ProviderRaycastAutoImportHelp),
-                "",
-                None,
+                Some(locale::LocaleKey::ProviderRaycastAutoImportHelp),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                locale::get_text(lang, locale::LocaleKey::ProviderRaycastManualCookieHelp),
-                None,
+                Some(locale::LocaleKey::ProviderRaycastManualCookieHelp),
             ),
             cookie_option(
                 lang,
                 "off",
-                "",
-                "",
-                Some(
-                    locale::get_text(lang, locale::LocaleKey::ProviderRaycastCookiesDisabled)
-                        .as_str(),
-                ),
+                Some(locale::LocaleKey::ProviderRaycastCookiesDisabled),
             ),
         ],
         "helmcode" => vec![
             cookie_option(
                 lang,
                 "auto",
-                "Automatically imports the signed-in Helmcode or NaN Builders browser session.",
-                "",
-                None,
+                Some(locale::LocaleKey::CookieHelpHelmcodeAuto),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header and select the tenant in the workspace field.",
-                None,
+                Some(locale::LocaleKey::CookieHelpHelmcodeManual),
             ),
         ],
         "typesafe" => vec![
             cookie_option(
                 lang,
                 "auto",
-                "Automatically imports the signed-in TypeSafe console session.",
-                "",
-                None,
+                Some(locale::LocaleKey::CookieHelpTypeSafeAuto),
             ),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from the TypeSafe billing page.",
-                None,
+                Some(locale::LocaleKey::CookieHelpTypeSafeManual),
             ),
         ],
         // Upstream's Hyper picker; the session can come from any selected
         // browser here, not only Chrome.
         "hyper" => vec![
-            cookie_option(
-                lang,
-                "auto",
-                "Prefer a signed-in Hyper browser session, then fall back to an API key.",
-                "",
-                None,
-            ),
+            cookie_option(lang, "auto", Some(locale::LocaleKey::CookieHelpHyperAuto)),
             cookie_option(
                 lang,
                 "manual",
-                "",
-                "Paste a Cookie header from hyper.charm.land.",
-                None,
+                Some(locale::LocaleKey::CookieHelpHyperManual),
             ),
-            cookie_option(
-                lang,
-                "off",
-                "",
-                "",
-                Some("Use only the configured API key."),
-            ),
+            cookie_option(lang, "off", Some(locale::LocaleKey::CookieHelpHyperOff)),
         ],
         _ => Vec::new(),
     }
 }
 
-/// Returns the API region options for a given provider.
+/// Returns the API region options for a given provider, labelled in `lang`.
 /// Empty vec means the provider has no region picker.
-pub fn region_options_for(provider_id: &str) -> Vec<RegionOption> {
+pub fn region_options_for(provider_id: &str, lang: Language) -> Vec<RegionOption> {
+    use codexbar::providers::{AlibabaRegion, AlibabaTokenPlanRegion, KimiRegion};
+    use locale::LocaleKey as K;
+    let option = |value: &str, key: K| RegionOption {
+        value: value.to_string(),
+        label: locale::get_text(lang, key),
+    };
     match provider_id {
-        "alibaba" => codexbar::providers::AlibabaRegion::ALL
+        "alibaba" => AlibabaRegion::ALL
             .iter()
-            .map(|region| RegionOption {
-                value: region.settings_value().to_string(),
-                label: region.display_name().to_string(),
+            .map(|region| {
+                let key = match region {
+                    AlibabaRegion::Singapore => K::RegionAlibabaSingapore,
+                    AlibabaRegion::UsEast => K::RegionAlibabaUsEast,
+                    AlibabaRegion::Germany => K::RegionAlibabaGermany,
+                    AlibabaRegion::HongKong => K::RegionAlibabaHongKong,
+                    AlibabaRegion::ChinaMainland => K::RegionAlibabaChinaMainland,
+                };
+                option(region.settings_value(), key)
             })
             .collect(),
         "zai" => vec![
-            RegionOption {
-                value: "global".to_string(),
-                label: "Global".to_string(),
-            },
-            RegionOption {
-                value: "china".to_string(),
-                label: "China Mainland (BigModel)".to_string(),
-            },
+            option("global", K::RegionZaiGlobal),
+            option("china", K::RegionZaiChinaMainland),
         ],
         "minimax" => vec![
-            RegionOption {
-                value: "global".to_string(),
-                label: codexbar::providers::MiniMaxRegion::Global
-                    .display_name()
-                    .to_string(),
-            },
-            RegionOption {
-                value: "cn".to_string(),
-                label: codexbar::providers::MiniMaxRegion::ChinaMainland
-                    .display_name()
-                    .to_string(),
-            },
+            option("global", K::RegionMiniMaxGlobal),
+            option("cn", K::RegionMiniMaxChinaMainland),
         ],
-        "kimi" => codexbar::providers::KimiRegion::ALL
+        "kimi" => KimiRegion::ALL
             .iter()
             .copied()
-            .map(|region| RegionOption {
-                value: region.settings_value().to_string(),
-                label: region.display_name().to_string(),
+            .map(|region| {
+                let key = match region {
+                    KimiRegion::China => K::RegionKimiChina,
+                    KimiRegion::International => K::RegionKimiInternational,
+                };
+                option(region.settings_value(), key)
             })
             .collect(),
-        "alibabatokenplan" => codexbar::providers::AlibabaTokenPlanRegion::ALL
+        "alibabatokenplan" => AlibabaTokenPlanRegion::ALL
             .iter()
             .copied()
-            .map(|region| RegionOption {
-                value: region.as_str().to_string(),
-                label: region.display_name().to_string(),
+            .map(|region| {
+                let key = match region {
+                    AlibabaTokenPlanRegion::Cn => K::RegionAlibabaTokenPlanChinaTeam,
+                    AlibabaTokenPlanRegion::Intl => K::RegionAlibabaTokenPlanInternationalTeam,
+                    AlibabaTokenPlanRegion::CnPersonal => K::RegionAlibabaTokenPlanChinaPersonal,
+                    AlibabaTokenPlanRegion::IntlPersonal => {
+                        K::RegionAlibabaTokenPlanInternationalPersonal
+                    }
+                };
+                option(region.as_str(), key)
             })
             .collect(),
         _ => Vec::new(),
@@ -1047,5 +919,6 @@ pub fn get_provider_cookie_source_options(
 
 #[tauri::command]
 pub fn get_provider_region_options(provider_id: String) -> Result<Vec<RegionOption>, String> {
-    Ok(region_options_for(&provider_id))
+    let lang = Settings::load().ui_language;
+    Ok(region_options_for(&provider_id, lang))
 }
