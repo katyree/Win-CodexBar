@@ -8,7 +8,7 @@
     reason = "TTY runner types reserved for future interactive session management"
 )]
 
-use super::tty_responder::{ResponderState, ScreenResponder, fire_substring_triggers};
+use super::tty_responder::{ResponderState, ScreenResponder};
 use crate::process_environment::ProcessEnvironment;
 use regex_lite::Regex;
 use std::collections::HashMap;
@@ -439,7 +439,9 @@ impl TtyCommandRunner {
         // later chunk, so triggers must also be checked against it here.
         fire_substring_triggers(options, &buffer, &mut triggered_sends, &mut writer);
         let mut responder = ResponderState::default();
-        responder.answer(options, &buffer, &mut writer);
+        if let Some(screen_responder) = &options.screen_responder {
+            responder.answer(screen_responder, &buffer, &mut writer);
+        }
 
         // Send the script if provided. PTYs expect carriage-return line endings
         // for interactive programs to treat writes like pressing Enter.
@@ -573,8 +575,8 @@ impl TtyCommandRunner {
                 fire_substring_triggers(options, &buffer, &mut triggered_sends, &mut writer);
             }
 
-            if received_output {
-                responder.answer(options, &buffer, &mut writer);
+            if received_output && let Some(screen_responder) = &options.screen_responder {
+                responder.answer(screen_responder, &buffer, &mut writer);
             }
 
             if stopped_early {
@@ -763,6 +765,25 @@ impl RollingBuffer {
 }
 
 /// Type the script lines into the PTY, honouring the configured delays.
+/// Send every not-yet-fired `send_on_substrings` entry whose trigger is in `buffer`.
+fn fire_substring_triggers(
+    options: &TtyCommandOptions,
+    buffer: &str,
+    triggered: &mut std::collections::HashSet<String>,
+    writer: &mut impl Write,
+) {
+    for (trigger, keys) in &options.send_on_substrings {
+        if !triggered.contains(trigger) && buffer.contains(trigger) {
+            let normalized = keys.replace('\n', "\r\n");
+            // Best-effort send-trigger input; a closed PTY drops the write.
+            let _trigger_written = write!(writer, "{}", normalized);
+            // Best-effort flush after a send-trigger write.
+            let _trigger_flushed = writer.flush();
+            triggered.insert(trigger.clone());
+        }
+    }
+}
+
 fn write_script_lines(
     writer: &mut Box<dyn Write + Send>,
     script_lines: &[&str],
@@ -903,6 +924,44 @@ mod tests {
             .run("cmd", "", opts)
             .expect("pty command should run");
         assert!(result.text.contains("LATE_Windows_NT"), "{}", result.text);
+    }
+
+    /// Same startup timing for the screen responder: the banner is drawn inside
+    /// the initial delay and nothing is printed afterwards.
+    #[cfg(windows)]
+    #[test]
+    fn screen_responder_fires_on_output_buffered_during_initial_delay() {
+        use crate::cli::tty_responder::ScreenReading;
+
+        fn on_banner(screen: &str) -> ScreenReading {
+            if screen.contains("Microsoft Windows") {
+                ScreenReading::Answer(vec!["echo LATE_%OS%\r", "exit\r"])
+            } else {
+                ScreenReading::Absent
+            }
+        }
+        let opts = TtyCommandOptions::new()
+            .with_timeout(10.0)
+            .with_idle_timeout(3.0)
+            .with_initial_delay(1.5)
+            .with_screen_responder(ScreenResponder {
+                read: on_banner,
+                after_dialog: &[],
+            });
+        let result = TtyCommandRunner::new()
+            .run("cmd", "", opts)
+            .expect("pty command should run");
+        assert!(result.text.contains("LATE_Windows_NT"), "{}", result.text);
+    }
+
+    #[test]
+    fn substring_triggers_fire_once_on_already_buffered_output() {
+        let options = TtyCommandOptions::new().with_send_on_substring("Enter", "go\n");
+        let mut triggered = std::collections::HashSet::new();
+        let mut sent = Vec::new();
+        fire_substring_triggers(&options, "Enter to confirm", &mut triggered, &mut sent);
+        fire_substring_triggers(&options, "Enter to confirm", &mut triggered, &mut sent);
+        assert_eq!(sent, b"go\r\n");
     }
 
     #[test]

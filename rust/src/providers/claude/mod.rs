@@ -478,7 +478,8 @@ fn javascript_hash_base36(text: &str) -> String {
 fn claude_usage_settings_args() -> [String; 2] {
     [
         "--settings".to_string(),
-        // `tui: default` also stops the "Try the new fullscreen renderer?" offer.
+        // Issue #778 (Claude Code 2.1.293): `tui: default` stops the "Try the new
+        // fullscreen renderer?" offer. Older builds ignore unknown settings keys.
         r#"{"remoteControlAtStartup":false,"tui":"default"}"#.to_string(),
     ]
 }
@@ -569,7 +570,7 @@ async fn run_claude_trust_preflight(
             initial_delay_secs: 0.6,
             script_char_delay_secs: 0.0,
             script_line_delay_secs: 0.0,
-            screen_responder: Some(trust_dialog::trust_dialog_keys),
+            screen_responder: Some(trust_dialog::TRUST_RESPONDER),
             script_retry_delays_secs: &[],
             script_done_substrings: &[],
             script_echo_substrings: &[],
@@ -675,8 +676,9 @@ fn claude_passive_probe_env(
     // Passive status/usage probes must not mutate or update the user's Claude CLI installation.
     base.insert("NO_COLOR".to_string(), "1".to_string());
     base.insert("DISABLE_AUTOUPDATER".to_string(), "1".to_string());
-    // Stops the "Claude in Chrome extension detected" offer, which would
-    // swallow `/usage`. Probe launch only; the user's config is untouched.
+    // Issue #778 (Claude Code 2.1.293): stops the "Claude in Chrome extension
+    // detected" offer, which would swallow `/usage`. Claude Code reads this
+    // variable; older builds ignore it. Probe launch only; config is untouched.
     base.insert("CLAUDE_CODE_ENABLE_CFC".to_string(), "0".to_string());
     base
 }
