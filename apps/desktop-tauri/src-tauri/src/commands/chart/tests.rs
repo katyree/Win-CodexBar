@@ -5,7 +5,7 @@ use super::{
 };
 use crate::commands::is_provider_cache_fresh;
 use codexbar::cost_reporting_period::{CostReportingPeriod, CostTimeZone};
-use codexbar::cost_scanner::CostSummary;
+use codexbar::cost_scanner::{CostSummary, TodayUsage};
 use codexbar::providers::muse::local_usage::{DailyUsage, Report};
 use codexbar::settings::Language;
 use codexbar::spend_contract::LocalHistoryCoverage;
@@ -155,8 +155,14 @@ fn local_usage_keeps_thirty_day_fixed_while_period_follows_selection() {
         &thirty,
         CostReportingPeriod::MonthToDate,
         Some(&month),
+        Some(&TodayUsage {
+            cost_usd: Some(1.25),
+            tokens: 42,
+        }),
     )
     .expect("usage is visible");
+    assert_eq!(summary.today_cost, Some(1.25));
+    assert_eq!(summary.latest_tokens, Some(42));
     assert_eq!(summary.thirty_day_cost, Some(30.0));
     assert_eq!(summary.thirty_day_tokens, Some(3_000));
     assert_eq!(summary.period_cost, Some(5.0));
@@ -186,4 +192,38 @@ fn english_estimate_note_is_localized() {
         localized_estimate_note("claude", Language::English),
         "Estimated from local Claude logs at API rates; token totals may differ from your bill"
     );
+}
+
+#[test]
+fn local_usage_today_hides_known_zero_and_unknown_cost_but_keeps_tokens() {
+    let thirty = CostSummary {
+        total_cost_usd: 30.0,
+        input_tokens: 3_000,
+        ..CostSummary::default()
+    };
+    let summary_for = |today: Option<&TodayUsage>| {
+        local_usage_summary_from_cost_summary(
+            "claude",
+            &thirty,
+            CostReportingPeriod::Rolling(30),
+            None,
+            today,
+        )
+        .expect("usage is visible")
+    };
+    let zero = summary_for(Some(&TodayUsage {
+        cost_usd: Some(0.0),
+        tokens: 0,
+    }));
+    assert_eq!((zero.today_cost, zero.latest_tokens), (None, None));
+    let unpriced = summary_for(Some(&TodayUsage {
+        cost_usd: None,
+        tokens: 1_500,
+    }));
+    assert_eq!(
+        (unpriced.today_cost, unpriced.latest_tokens),
+        (None, Some(1_500))
+    );
+    let absent = summary_for(None);
+    assert_eq!((absent.today_cost, absent.latest_tokens), (None, None));
 }

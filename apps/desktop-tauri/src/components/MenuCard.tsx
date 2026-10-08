@@ -134,13 +134,20 @@ export default function MenuCard({
     return () => window.removeEventListener(DEEPSEEK_PRICING_EVENT, onPricing);
   }, [provider.providerId]);
 
+  // Another provider or account must not show the previous card's chart.
+  useEffect(() => {
+    setChartData(null);
+  }, [provider.providerId, provider.accountEmail]);
+
+  // Re-read the local-usage chart when the local calendar day changes (seen on
+  // the next render, e.g. a provider update), so "Today" does not freeze at the
+  // first mount without a full transcript walk on every refresh.
+  const localDay = new Date().toLocaleDateString("sv");
   useEffect(() => {
     if (!providerSupportsChartData(provider.providerId)) {
-      setChartData(null);
       return;
     }
     let cancelled = false;
-    setChartData(null);
     getProviderChartData(
       provider.providerId,
       provider.accountEmail ?? undefined,
@@ -157,7 +164,7 @@ export default function MenuCard({
     return () => {
       cancelled = true;
     };
-  }, [provider.providerId, provider.accountEmail, onLayoutChange]);
+  }, [provider.providerId, provider.accountEmail, localDay, onLayoutChange]);
 
   const isWayfinder = provider.providerId === "wayfinder";
   const email = !isWayfinder && provider.accountEmail

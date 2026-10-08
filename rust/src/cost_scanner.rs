@@ -42,6 +42,7 @@ mod claude_usage;
 mod codex;
 mod read_receipt;
 mod stats;
+mod today;
 mod window;
 pub use claude_incomplete::ClaudeIncompleteReport;
 use claude_incomplete::ClaudeIncompleteTracker;
@@ -54,6 +55,7 @@ use claude_usage::{
 };
 pub use read_receipt::CodexScanReadReceipt;
 pub use stats::CostScanStats;
+pub use today::TodayUsage;
 
 /// Completeness of the pricing coverage in a [`CostSummary`] (upstream 0.48.0 F18).
 ///
@@ -509,6 +511,8 @@ pub struct ClaudeQuotaHistoryScan {
 /// as unattributed until a trustworthy historical account signal exists.
 #[derive(Debug, Clone)]
 pub struct ClaudeChartSnapshot {
+    /// Totals for the day the scan bucketed against (the window's last day).
+    pub today: TodayUsage,
     pub summary: CostSummary,
     pub daily_cost: Vec<(String, Option<f64>)>,
     pub daily_tokens: Vec<(String, u64)>,
@@ -662,7 +666,7 @@ impl CostScanner {
         let roots = self.claude_projects_roots();
         let mut summary = CostSummary::default();
         let now = Utc::now();
-        let window = self.transcript_window(now, now.date_naive());
+        let window = self.claude_window(now);
         let cutoff = window.cutoff;
 
         summary.period_start = Some(window.start);
@@ -746,7 +750,7 @@ impl CostScanner {
     ) -> ClaudeChartSnapshot {
         let roots = self.claude_projects_roots();
         let now = Utc::now();
-        let window = self.transcript_window(now, cost_bucket_zone().date(now));
+        let window = self.claude_window(now);
         let cutoff = window.cutoff;
         let mut summary = CostSummary {
             period_start: Some(window.start),
@@ -766,7 +770,7 @@ impl CostScanner {
         let mut unknown_cost_dates = HashSet::new();
         for days_ago in 0..slot_days {
             let date = window.end - Duration::days(days_ago as i64);
-            let key = date.format("%Y-%m-%d").to_string();
+            let key = today::day_key(date);
             daily_cost.insert(key.clone(), None);
             daily_tokens.insert(key, 0);
         }
@@ -844,11 +848,13 @@ impl CostScanner {
             zero_fill_uninitialized_claude_daily_costs(&mut daily_cost, &unknown_cost_dates);
         }
 
+        let today = TodayUsage::from_buckets(window.end, &daily_cost, &daily_tokens);
         let mut daily_cost = daily_cost.into_iter().collect::<Vec<_>>();
         daily_cost.sort_by(|left, right| left.0.cmp(&right.0));
         let mut daily_tokens = daily_tokens.into_iter().collect::<Vec<_>>();
         daily_tokens.sort_by(|left, right| left.0.cmp(&right.0));
         ClaudeChartSnapshot {
+            today,
             summary,
             daily_cost,
             daily_tokens,
@@ -943,7 +949,7 @@ impl CostScanner {
     fn claude_projects_roots(&self) -> claude_roots::ClaudeProjectsRoots {
         claude_roots::claude_projects_roots(
             std::env::var("CLAUDE_CONFIG_DIR").ok().as_deref(),
-            dirs::home_dir().as_deref(),
+            crate::pi_session_cost::scan_home().as_deref(),
         )
     }
 
@@ -1321,10 +1327,7 @@ fn add_claude_record_to_daily_costs(
     let Some(timestamp) = record.timestamp else {
         return true;
     };
-    let date_str = cost_bucket_zone()
-        .date(timestamp)
-        .format("%Y-%m-%d")
-        .to_string();
+    let date_str = today::day_key(cost_bucket_zone().date(timestamp));
     if let Some(cost) = daily_costs.get_mut(&date_str) {
         if unknown_cost_dates.contains(&date_str) {
             return false;
@@ -1368,7 +1371,7 @@ pub fn has_cost_usage_sources() -> bool {
         .iter()
         .any(|dir| dir.exists())
         || scanner.claude_projects_roots().has_possible_roots()
-        || crate::pi_session_cost::pi_compatible_session_roots(dirs::home_dir())
+        || crate::pi_session_cost::pi_compatible_session_roots(crate::pi_session_cost::scan_home())
             .iter()
             .any(|dir| dir.exists())
 }
@@ -1395,7 +1398,7 @@ pub fn get_daily_cost_and_incomplete_history(provider: &str, days: u32) -> Daily
     // Initialize all days with 0
     for days_ago in 0..days {
         let date = today - Duration::days(days_ago as i64);
-        let date_str = date.format("%Y-%m-%d").to_string();
+        let date_str = today::day_key(date);
         daily_costs.insert(
             date_str,
             (provider != "codex" && provider != "claude" && provider != "pi").then_some(0.0),
@@ -1536,7 +1539,7 @@ pub fn get_daily_token_history(provider: &str, days: u32) -> (Vec<(String, u64)>
     // Initialize all days with 0
     for days_ago in 0..days {
         let date = today - Duration::days(days_ago as i64);
-        let date_str = date.format("%Y-%m-%d").to_string();
+        let date_str = today::day_key(date);
         daily_tokens.insert(date_str, 0);
     }
 
@@ -1636,10 +1639,7 @@ fn add_claude_record_to_daily_tokens(
     let Some(timestamp) = record.timestamp else {
         return true;
     };
-    let date_str = cost_bucket_zone()
-        .date(timestamp)
-        .format("%Y-%m-%d")
-        .to_string();
+    let date_str = today::day_key(cost_bucket_zone().date(timestamp));
     if let Some(slot) = daily_tokens.get_mut(&date_str) {
         // Claude reports cache reads and writes separately from input, so the
         // day total includes them (same rule as the window and model totals).

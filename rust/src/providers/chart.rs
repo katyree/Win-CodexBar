@@ -7,7 +7,7 @@
 
 use crate::codex_costs::codex_quota_windows_from_cache;
 use crate::core::{JsonlScanner, ProviderId, RateWindow};
-use crate::cost_scanner::{CostScanner, CostSummary};
+use crate::cost_scanner::{CostScanner, CostSummary, TodayUsage};
 use crate::providers::claude::quota_history::{
     ClaudeQuotaHistoryOptions, ClaudeQuotaResetObservation, aggregate_claude_quota_windows,
 };
@@ -23,6 +23,9 @@ pub struct ProviderChartSnapshot {
     /// Claude incomplete proxy-request count per local day (upstream 0.60.5 #3688).
     pub daily_incomplete: Vec<(String, u32)>,
     pub tokens_incomplete: bool,
+    /// Totals for the calendar day the scan bucketed against, when the
+    /// provider reports them.
+    pub today: Option<TodayUsage>,
     pub local_summary: Option<CostSummary>,
     pub quota_window_history: Option<QuotaWindowHistorySnapshot>,
 }
@@ -122,6 +125,7 @@ fn build_claude_chart_snapshot(
     });
 
     ProviderChartSnapshot {
+        today: Some(scan.today),
         daily_cost: scan.daily_cost,
         daily_tokens: scan.daily_tokens,
         daily_incomplete: scan.daily_incomplete,
