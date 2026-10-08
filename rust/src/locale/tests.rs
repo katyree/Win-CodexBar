@@ -588,6 +588,7 @@ fn test_every_language_translates_every_key_with_the_same_format_placeholders() 
         ("pt-BR", include_str!("pt-BR.ftl")),
         ("ru-RU", include_str!("ru-RU.ftl")),
         ("tr-TR", include_str!("tr-TR.ftl")),
+        ("uk-UA", include_str!("uk-UA.ftl")),
     ];
 
     for (locale, resource) in resources {
