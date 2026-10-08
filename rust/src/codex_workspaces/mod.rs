@@ -3,6 +3,7 @@
 //! Attributes local Codex rollout usage to projects, sessions, models, and days.
 //! Codex-only; never writes the Codex catalog database.
 
+mod freshness;
 mod indexer;
 mod sidecar;
 mod thread_names;
