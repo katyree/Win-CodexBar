@@ -19,6 +19,9 @@ use super::types::{
 };
 use super::{CHATS_DISPLAY_NAME, CHATS_PROJECT_ID};
 
+// Bound reuse so background reads discover new usage without a forced refresh.
+const SNAPSHOT_CACHE_TTL: chrono::Duration = chrono::Duration::minutes(5);
+
 #[derive(Debug, thiserror::Error)]
 pub enum IndexError {
     #[error("codex home could not be resolved")]
@@ -135,7 +138,19 @@ impl CodexWorkspacesIndex {
     pub fn load_snapshot<F>(
         &self,
         force_refresh: bool,
+        progress: F,
+    ) -> Result<CodexLocalProjectUsageSnapshot, IndexError>
+    where
+        F: FnMut(Progress),
+    {
+        self.load_snapshot_at(force_refresh, progress, Utc::now())
+    }
+
+    pub(super) fn load_snapshot_at<F>(
+        &self,
+        force_refresh: bool,
         mut progress: F,
+        now: DateTime<Utc>,
     ) -> Result<CodexLocalProjectUsageSnapshot, IndexError>
     where
         F: FnMut(Progress),
@@ -143,10 +158,16 @@ impl CodexWorkspacesIndex {
         let scope = self.scope()?;
         let sidecar = self.sidecar()?;
         let source_status = read_catalog_status(&scope.state_database);
+        let zone = crate::cost_reporting_period::cost_bucket_zone();
+        let today = zone.date(now);
 
         if !force_refresh {
             match sidecar.load_latest_snapshot(scope.scope_signature(), self.history_days) {
-                Ok(Some(mut cached)) => {
+                Ok(Some(mut cached))
+                    if cached.updated_at <= now
+                        && now - cached.updated_at < SNAPSHOT_CACHE_TTL
+                        && zone.date(cached.updated_at) == today =>
+                {
                     cached.source_status = source_status;
                     apply_session_names_and_ranking(
                         &mut cached,
@@ -155,13 +176,12 @@ impl CodexWorkspacesIndex {
                     );
                     return Ok(cached);
                 }
-                Ok(None) => {}
+                Ok(_) => {}
                 Err(error) => return Err(error.into()),
             }
         }
 
         progress(Progress::phase(ProgressPhase::ScanningLogs));
-        let today = crate::cost_reporting_period::cost_bucket_zone().date(Utc::now());
         let since = codex_period_start(today, self.history_days);
         let range = CostUsageDayRange::new(since, today);
 
@@ -275,7 +295,8 @@ impl CodexWorkspacesIndex {
             .collect();
 
         let mut snapshot = CodexLocalProjectUsageSnapshot {
-            updated_at: Utc::now(),
+            // Use the scan's calendar instant, including if it crosses midnight.
+            updated_at: now,
             history_days: self.history_days,
             scope_signature: scope.scope_signature().to_string(),
             indexed_file_count: indexed,
