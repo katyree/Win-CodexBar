@@ -2,6 +2,7 @@
 
 pub mod accounts;
 mod admin_api;
+mod auto_precision;
 pub mod claude_swap;
 mod cli_reset;
 mod cli_screen;
@@ -56,9 +57,7 @@ static CLI_RESULT_CACHE: LazyLock<Mutex<Option<CachedCliResult>>> =
     LazyLock::new(|| Mutex::new(None));
 
 fn clear_account_caches(credential_path: &std::path::Path) {
-    if let Ok(mut cache) = CLI_RESULT_CACHE.lock() {
-        *cache = None;
-    }
+    clear_cli_result_cache();
     oauth::clear_account_cache(credential_path);
 }
 
@@ -69,6 +68,13 @@ fn cache_cli_result(result: ProviderFetchResult) {
             result,
             cached_at: Instant::now(),
         });
+    }
+}
+
+/// Drop the cached CLI result once a live OAuth answer is newer than it.
+fn clear_cli_result_cache() {
+    if let Ok(mut guard) = CLI_RESULT_CACHE.lock() {
+        *guard = None;
     }
 }
 
@@ -218,7 +224,8 @@ fn load_cached_probe_output(probe_dir: &std::path::Path, login: &str) -> Option<
     let raw = std::fs::read_to_string(probe_dir.join(CLAUDE_PROBE_CACHE_FILE)).ok()?;
     let cache: ClaudeProbeCache = serde_json::from_str(&raw).ok()?;
     let age = unix_now_secs().saturating_sub(cache.captured_at_unix);
-    if login.is_empty()
+    if auto_precision::probe_screen_is_superseded(cache.captured_at_unix)
+        || login.is_empty()
         || cache.login != login
         || age > CLAUDE_PROBE_CACHE_TTL.as_secs()
         || cache.output.trim().is_empty()
@@ -832,7 +839,10 @@ impl Provider for ClaudeProvider {
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
         match ctx.source_mode {
-            SourceMode::Auto => self.fetch_via_auto(ctx).await,
+            SourceMode::Auto => self
+                .fetch_via_auto(ctx)
+                .await
+                .map(auto_precision::finish_auto_result),
             SourceMode::OAuth => self.fetch_via_oauth(ctx).await,
             SourceMode::Web => self.fetch_via_web(ctx).await,
             SourceMode::Cli => match self.fetch_via_cli(ctx).await {
@@ -2505,6 +2515,11 @@ Usage:                 0 input, 0 output, 0 cache read
         assert!((cached.usage.primary.used_percent - 42.0).abs() < 0.01);
         assert_eq!(cached.source_label, "cli");
         assert!(!cached.has_successful_claude_cli_quota);
+
+        // A live non-CLI success clears the cache. Same test, because the
+        // global is shared and tests run in parallel without a lock.
+        clear_cli_result_cache();
+        assert!(cached_cli_result().is_none());
     }
 
     #[test]
