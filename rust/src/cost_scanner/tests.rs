@@ -3548,6 +3548,9 @@ fn claude_day_total_includes_cache_and_matches_summary_and_model_totals() {
 #[path = "tests/claude_swap.rs"]
 mod claude_swap;
 #[cfg(test)]
+#[path = "tests/claude_today.rs"]
+mod claude_today;
+#[cfg(test)]
 #[path = "tests/copied_prefix.rs"]
 mod copied_prefix;
 #[cfg(test)]

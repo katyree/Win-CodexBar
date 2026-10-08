@@ -501,6 +501,18 @@ pub struct ClaudeQuotaHistoryScan {
     pub history_coverage_established: bool,
 }
 
+/// Local-usage totals for the calendar day (in the cost bucket zone) a scan
+/// bucketed against, read from the same buckets as the daily history so the
+/// scan's clock decides which day is "today".
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct TodayUsage {
+    /// `Some(0.0)` is a known zero; `None` means the cost is unknown (an
+    /// unpriced record, or a scan that could not establish coverage).
+    pub cost_usd: Option<f64>,
+    /// Tokens counted for the day (input + output + cache read + cache write).
+    pub tokens: u64,
+}
+
 /// All chart-facing Claude history derived from one project-tree traversal.
 ///
 /// The result keeps provider parsing and aggregation in Rust so callers can
@@ -509,6 +521,8 @@ pub struct ClaudeQuotaHistoryScan {
 /// as unattributed until a trustworthy historical account signal exists.
 #[derive(Debug, Clone)]
 pub struct ClaudeChartSnapshot {
+    /// Totals for the day the scan bucketed against (the window's last day).
+    pub today: TodayUsage,
     pub summary: CostSummary,
     pub daily_cost: Vec<(String, Option<f64>)>,
     pub daily_tokens: Vec<(String, u64)>,
@@ -662,7 +676,7 @@ impl CostScanner {
         let roots = self.claude_projects_roots();
         let mut summary = CostSummary::default();
         let now = Utc::now();
-        let window = self.transcript_window(now, now.date_naive());
+        let window = self.claude_window(now);
         let cutoff = window.cutoff;
 
         summary.period_start = Some(window.start);
@@ -746,7 +760,7 @@ impl CostScanner {
     ) -> ClaudeChartSnapshot {
         let roots = self.claude_projects_roots();
         let now = Utc::now();
-        let window = self.transcript_window(now, cost_bucket_zone().date(now));
+        let window = self.claude_window(now);
         let cutoff = window.cutoff;
         let mut summary = CostSummary {
             period_start: Some(window.start),
@@ -844,11 +858,17 @@ impl CostScanner {
             zero_fill_uninitialized_claude_daily_costs(&mut daily_cost, &unknown_cost_dates);
         }
 
+        let today_key = window.end.format("%Y-%m-%d").to_string();
+        let today = TodayUsage {
+            cost_usd: daily_cost.get(&today_key).copied().flatten(),
+            tokens: daily_tokens.get(&today_key).copied().unwrap_or(0),
+        };
         let mut daily_cost = daily_cost.into_iter().collect::<Vec<_>>();
         daily_cost.sort_by(|left, right| left.0.cmp(&right.0));
         let mut daily_tokens = daily_tokens.into_iter().collect::<Vec<_>>();
         daily_tokens.sort_by(|left, right| left.0.cmp(&right.0));
         ClaudeChartSnapshot {
+            today,
             summary,
             daily_cost,
             daily_tokens,

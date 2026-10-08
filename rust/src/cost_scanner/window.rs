@@ -39,6 +39,18 @@ impl CostScanner {
         }
     }
 
+    /// The window the Claude scans use, anchored on the bucket zone's today.
+    ///
+    /// Rolling(1) is the zone's calendar day (not a trailing 24 hours), so the
+    /// one-day scan agrees with today's bucket in the chart snapshot. Other
+    /// periods keep [`Self::transcript_window`].
+    pub(super) fn claude_window(&self, now: DateTime<Utc>) -> ScanWindow {
+        if self.period == CostReportingPeriod::Rolling(1) {
+            return self.calendar_window(now, None);
+        }
+        self.transcript_window(now, cost_bucket_zone().date(now))
+    }
+
     /// The window used by the Claude and Pi transcript scanners.
     ///
     /// A rolling window keeps its historical shape (a `now - N * 24h` cutoff

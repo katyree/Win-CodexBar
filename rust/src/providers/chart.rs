@@ -7,14 +7,13 @@
 
 use crate::codex_costs::codex_quota_windows_from_cache;
 use crate::core::{JsonlScanner, ProviderId, RateWindow};
-use crate::cost_reporting_period::cost_bucket_zone;
-use crate::cost_scanner::{CostScanner, CostSummary};
+use crate::cost_scanner::{CostScanner, CostSummary, TodayUsage};
 use crate::providers::claude::quota_history::{
     ClaudeQuotaHistoryOptions, ClaudeQuotaResetObservation, aggregate_claude_quota_windows,
 };
 use crate::providers::claude::reset_observations;
 use crate::providers::codex::reset_observations as codex_reset_observations;
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Utc};
 use std::sync::atomic::AtomicBool;
 
 #[derive(Debug, Clone, Default)]
@@ -24,11 +23,9 @@ pub struct ProviderChartSnapshot {
     /// Claude incomplete proxy-request count per local day (upstream 0.60.5 #3688).
     pub daily_incomplete: Vec<(String, u32)>,
     pub tokens_incomplete: bool,
-    /// Claude cost for the current bucket-zone calendar day; `None` when the
-    /// day has no usage or its cost is not fully priced.
-    pub today_cost: Option<f64>,
-    /// Claude tokens (input + output + cache) for the current bucket-zone day.
-    pub today_tokens: Option<u64>,
+    /// Totals for the calendar day the scan bucketed against, when the
+    /// provider reports them.
+    pub today: Option<TodayUsage>,
     pub local_summary: Option<CostSummary>,
     pub quota_window_history: Option<QuotaWindowHistorySnapshot>,
 }
@@ -127,12 +124,8 @@ fn build_claude_chart_snapshot(
         })
     });
 
-    let today = cost_bucket_zone().date(now);
-    let (today_cost, today_tokens) =
-        claude_today_usage(&scan.daily_cost, &scan.daily_tokens, today);
     ProviderChartSnapshot {
-        today_cost,
-        today_tokens,
+        today: Some(scan.today),
         daily_cost: scan.daily_cost,
         daily_tokens: scan.daily_tokens,
         daily_incomplete: scan.daily_incomplete,
@@ -140,27 +133,6 @@ fn build_claude_chart_snapshot(
         local_summary: Some(scan.summary),
         quota_window_history,
     }
-}
-
-/// Today's Claude cost and tokens from the per-day chart buckets, which use the
-/// same bucket zone as `today`. Zero or unpriced days yield `None`.
-fn claude_today_usage(
-    daily_cost: &[(String, Option<f64>)],
-    daily_tokens: &[(String, u64)],
-    today: NaiveDate,
-) -> (Option<f64>, Option<u64>) {
-    let key = today.format("%Y-%m-%d").to_string();
-    let cost = daily_cost
-        .iter()
-        .find(|(day, _)| *day == key)
-        .and_then(|(_, cost)| *cost)
-        .filter(|cost| *cost > 0.0);
-    let tokens = daily_tokens
-        .iter()
-        .find(|(day, _)| *day == key)
-        .map(|(_, tokens)| *tokens)
-        .filter(|tokens| *tokens > 0);
-    (cost, tokens)
 }
 
 fn load_and_persist_reset_observations(
@@ -266,54 +238,4 @@ fn build_codex_quota_history(
             .collect(),
         history_coverage_established,
     })
-}
-
-#[cfg(test)]
-mod claude_today_tests {
-    use super::claude_today_usage;
-    use crate::cost_reporting_period::CostTimeZone;
-    use chrono::{TimeZone, Utc};
-
-    type Fixture = (Vec<(String, Option<f64>)>, Vec<(String, u64)>);
-
-    fn fixture() -> Fixture {
-        (
-            vec![
-                ("2026-10-06".to_string(), Some(1.5)),
-                ("2026-10-07".to_string(), Some(2.25)),
-                ("2026-10-08".to_string(), None),
-            ],
-            vec![
-                ("2026-10-06".to_string(), 100),
-                ("2026-10-07".to_string(), 750),
-                ("2026-10-08".to_string(), 0),
-            ],
-        )
-    }
-
-    #[test]
-    fn today_is_the_zone_calendar_day_not_utc() {
-        let (cost, tokens) = fixture();
-        // 2026-10-07 20:00 UTC is already 2026-10-08 05:00 in Tokyo.
-        let now = Utc.with_ymd_and_hms(2026, 10, 7, 20, 0, 0).unwrap();
-        let tokyo = CostTimeZone::Named(chrono_tz::Asia::Tokyo).date(now);
-        assert_eq!(claude_today_usage(&cost, &tokens, tokyo), (None, None));
-        let utc = CostTimeZone::UTC.date(now);
-        assert_eq!(
-            claude_today_usage(&cost, &tokens, utc),
-            (Some(2.25), Some(750))
-        );
-    }
-
-    #[test]
-    fn today_ignores_other_days_and_missing_buckets() {
-        let (cost, tokens) = fixture();
-        let day = chrono::NaiveDate::from_ymd_opt(2026, 10, 6).unwrap();
-        assert_eq!(
-            claude_today_usage(&cost, &tokens, day),
-            (Some(1.5), Some(100))
-        );
-        let missing = chrono::NaiveDate::from_ymd_opt(2026, 11, 1).unwrap();
-        assert_eq!(claude_today_usage(&cost, &tokens, missing), (None, None));
-    }
 }
