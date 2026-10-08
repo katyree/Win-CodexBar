@@ -5,7 +5,7 @@ use super::{
 use crate::core::ProviderError;
 use base64::Engine;
 use reqwest::header::HeaderValue;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[test]
 fn saved_account_refresh_errors_distinguish_reauthentication_from_retry() {
@@ -349,67 +349,11 @@ fn parses_retry_after_seconds() {
 }
 
 #[test]
-fn tiny_retry_after_is_floored_and_consecutive_429s_ramp() {
-    let floor = ClaudeOAuthFetcher::DEFAULT_RATE_LIMIT_BACKOFF;
-    assert_eq!(
-        ClaudeOAuthFetcher::bounded_rate_limit_backoff(Duration::from_secs(1), 1),
-        floor
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::bounded_rate_limit_backoff(Duration::from_secs(0), 2),
-        floor * 2
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::bounded_rate_limit_backoff(Duration::from_secs(1), 4),
-        floor * 8
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::bounded_rate_limit_backoff(Duration::from_secs(90 * 60), 1),
-        Duration::from_secs(60 * 60)
-    );
-}
-
-#[test]
-fn expired_rate_limit_gate_resets_consecutive_ramp() {
-    let floor = ClaudeOAuthFetcher::DEFAULT_RATE_LIMIT_BACKOFF;
-    let start = Instant::now();
-    let mut gate = None;
-
-    assert_eq!(
-        ClaudeOAuthFetcher::record_rate_limit_locked(&mut gate, start, Duration::from_secs(1)),
-        floor
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::record_rate_limit_locked(&mut gate, start, Duration::from_secs(1)),
-        floor * 2
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::record_rate_limit_locked(
-            &mut gate,
-            start + floor * 2 + Duration::from_secs(1),
-            Duration::from_secs(1)
-        ),
-        floor
-    );
-}
-
-#[test]
 fn invalid_retry_after_uses_default_backoff() {
     let header = HeaderValue::from_static("not-a-date");
     let duration = ClaudeOAuthFetcher::retry_after_duration(Some(&header));
 
     assert_eq!(duration, ClaudeOAuthFetcher::DEFAULT_RATE_LIMIT_BACKOFF);
-}
-
-#[test]
-fn rate_limit_gate_blocks_and_clears() {
-    ClaudeOAuthFetcher::clear_rate_limit();
-
-    ClaudeOAuthFetcher::record_rate_limit(Duration::from_secs(30));
-    assert!(ClaudeOAuthFetcher::rate_limit_backoff_remaining().is_some());
-
-    ClaudeOAuthFetcher::clear_rate_limit();
-    assert!(ClaudeOAuthFetcher::rate_limit_backoff_remaining().is_none());
 }
 
 #[test]
@@ -627,4 +571,52 @@ fn missing_user_profile_scope_recommends_a_usable_credential_source() {
         format!("OAuth token does not meet scope requirement 'user:profile'. {recovery}");
     assert!(forbidden.contains("scope requirement"), "{forbidden}");
     assert!(!forbidden.contains("setup-token"), "{forbidden}");
+}
+
+#[test]
+fn gate_precheck_blocks_with_unchanged_error_and_serves_cache_without_request() {
+    use super::usage_gate::UsageGate;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("CodexBar").join("gate.json");
+    let now = 1_000_000_000_000_i64;
+    let gate = std::sync::Mutex::new(UsageGate::new(Some(path.clone())));
+
+    assert!(ClaudeOAuthFetcher::gate_precheck(&gate, now, "fp").is_none());
+
+    gate.lock().unwrap().record_success(
+        now,
+        "fp",
+        r#"{"fiveHour":{"utilization":42.0,"resetsAt":"2030-01-01T00:00:00Z"}}"#.into(),
+    );
+    let cached = ClaudeOAuthFetcher::gate_precheck(&gate, now + 1000, "fp")
+        .expect("cached")
+        .expect("ok");
+    assert_eq!(cached.five_hour.unwrap().utilization, Some(42.0));
+    assert!(ClaudeOAuthFetcher::gate_precheck(&gate, now + 1000, "other").is_none());
+
+    gate.lock()
+        .unwrap()
+        .record_rate_limit(now + 4 * 60_000, "fp", Duration::ZERO);
+    let err = ClaudeOAuthFetcher::gate_precheck(&gate, now + 5 * 60_000, "fp")
+        .expect("blocked")
+        .unwrap_err();
+    assert!(is_rate_limited_error(&err));
+    assert_eq!(
+        err.to_string(),
+        ClaudeOAuthFetcher::rate_limited_error(Duration::from_secs(240)).to_string()
+    );
+}
+
+#[test]
+fn gate_survives_a_poisoned_mutex() {
+    use super::usage_gate::UsageGate;
+    let gate = std::sync::Arc::new(std::sync::Mutex::new(UsageGate::new(None)));
+    let g2 = gate.clone();
+    let joined = std::thread::spawn(move || {
+        let _guard = g2.lock().unwrap();
+        panic!("poison");
+    })
+    .join();
+    assert!(joined.is_err());
+    assert!(ClaudeOAuthFetcher::gate_precheck(&gate, 1_000_000_000_000, "fp").is_none());
 }
