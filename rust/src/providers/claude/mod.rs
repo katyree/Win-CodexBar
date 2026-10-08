@@ -2,6 +2,7 @@
 
 pub mod accounts;
 mod admin_api;
+mod auto_precision;
 pub mod claude_swap;
 mod cli_reset;
 mod cli_screen;
@@ -55,9 +56,7 @@ static CLI_RESULT_CACHE: LazyLock<Mutex<Option<CachedCliResult>>> =
     LazyLock::new(|| Mutex::new(None));
 
 fn clear_account_caches(credential_path: &std::path::Path) {
-    if let Ok(mut cache) = CLI_RESULT_CACHE.lock() {
-        *cache = None;
-    }
+    clear_cli_result_cache();
     oauth::clear_account_cache(credential_path);
 }
 
@@ -68,6 +67,13 @@ fn cache_cli_result(result: ProviderFetchResult) {
             result,
             cached_at: Instant::now(),
         });
+    }
+}
+
+/// Drop the cached CLI result once a live OAuth answer is newer than it.
+fn clear_cli_result_cache() {
+    if let Ok(mut guard) = CLI_RESULT_CACHE.lock() {
+        *guard = None;
     }
 }
 
@@ -913,7 +919,13 @@ impl ClaudeProvider {
             .as_ref()
             .err()
             .is_some_and(oauth_failure_uses_cli_cache);
-        if let Some(result) = record_auto_source(&mut failures, "OAuth", oauth_result)? {
+        if let Some(mut result) = record_auto_source(&mut failures, "OAuth", oauth_result)? {
+            // Auto may also answer from the CLI, which prints whole percents;
+            // match that precision so the sources do not flip by a point (#776).
+            auto_precision::floor_to_cli_precision(&mut result);
+            // A live OAuth answer supersedes any older cached CLI reading, so a
+            // later rate limit cannot fall back to a staler (lower) value.
+            clear_cli_result_cache();
             return Ok(result);
         }
 
