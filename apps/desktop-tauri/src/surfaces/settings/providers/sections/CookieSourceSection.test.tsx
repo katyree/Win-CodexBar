@@ -7,6 +7,7 @@ const tauriMocks = vi.hoisted(() => ({
 
 vi.mock("../../../../lib/tauri", () => tauriMocks);
 
+import { loadStyles, ruleBlock } from "../../../../test/styles";
 import { CookieSourceSection } from "./CookieSourceSection";
 
 const OPTIONS = [
@@ -80,5 +81,11 @@ describe("CookieSourceSection manual cookie hint", () => {
     expect(
       screen.queryByRole("button", { name: "ProviderUseAutomaticCookies" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("wraps the segmented options inside the narrow detail pane", () => {
+    const rule = ruleBlock(loadStyles(), ".provider-detail-segmented");
+    expect(rule).toMatch(/flex-wrap:\s*wrap;/);
+    expect(rule).toMatch(/max-width:\s*100%;/);
   });
 });

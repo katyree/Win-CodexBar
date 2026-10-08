@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../../i18n/LocaleProvider";
 import { buildBundle } from "../../../test/localeHarness";
 import { TEST_PROVIDER_CATALOG } from "../../../test/providerCatalog";
+import { loadStyles, ruleBlock } from "../../../test/styles";
 import {
   ProvidersSidebar,
   type ProviderSidebarRow,
@@ -153,5 +154,50 @@ describe("ProvidersSidebar", () => {
     );
 
     expect(await screen.findByRole("button", { name: "Move up Codex" })).toBeDisabled();
+  });
+});
+
+// jsdom runs with `css: false` and no layout, so assert the stylesheet rules
+// directly: translated status lines ("Отключено — авто", ~97px) must wrap
+// inside the ~89px text column at the 600px settings window, not ellipsize.
+describe("Providers tab text fitting", () => {
+  it("wraps names and status lines to two lines instead of one ellipsized line", () => {
+    const stylesSource = loadStyles();
+    for (const selector of [
+      ".providers-sidebar__name",
+      ".providers-sidebar__subtitle-primary",
+    ]) {
+      const rule = ruleBlock(stylesSource, selector);
+      expect(rule).toMatch(/-webkit-line-clamp:\s*2;/);
+      expect(rule).not.toContain("nowrap");
+    }
+  });
+
+  it("keeps the full name and status line available as a tooltip", async () => {
+    const providers: ProviderSidebarRow[] = [{
+      id: "alibaba",
+      displayName: "Alibaba Token Plan",
+      enabled: false,
+      status: "disabled",
+      subtitlePrimary: "Отключено — авто",
+    }];
+    const { container } = render(
+      <LocaleProvider>
+        <ProvidersSidebar
+          providers={providers}
+          selectedId={null}
+          searchText=""
+          onSearchTextChange={vi.fn()}
+          onSelect={vi.fn()}
+          onReorder={vi.fn()}
+          onToggleEnabled={vi.fn()}
+        />
+      </LocaleProvider>,
+    );
+    await screen.findByRole("listbox", { name: "ProvidersAriaLabel" });
+    expect(container.querySelector(".providers-sidebar__name")?.getAttribute("title"))
+      .toBe("Alibaba Token Plan");
+    expect(container.querySelector(".providers-sidebar__subtitle-primary")?.getAttribute("title"))
+      .toBe("Отключено — авто");
   });
 });
