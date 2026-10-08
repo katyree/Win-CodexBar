@@ -25,6 +25,7 @@ pub mod hooks;
 pub mod serve;
 pub mod sessions;
 pub mod toon;
+pub mod tty_responder;
 pub mod tty_runner;
 pub mod usage;
 pub mod workspaces;
