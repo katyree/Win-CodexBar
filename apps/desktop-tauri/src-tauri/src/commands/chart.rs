@@ -233,6 +233,7 @@ fn build_provider_chart_data_with_cancel(
                 summary,
                 period,
                 period_summary.as_ref(),
+                (snapshot.today_cost, snapshot.today_tokens),
             )
         });
         store_local_usage_summary(&provider_id, local_usage.clone());
@@ -403,6 +404,7 @@ fn local_usage_summary_from_cost_summary(
     summary: &CostSummary,
     period: CostReportingPeriod,
     period_summary: Option<&CostSummary>,
+    (today_cost, latest_tokens): (Option<f64>, Option<u64>),
 ) -> Option<ProviderLocalUsageSummary> {
     let thirty_tokens = total_tokens(provider_id, summary);
     let has_usage = summary.sessions_count > 0
@@ -410,13 +412,13 @@ fn local_usage_summary_from_cost_summary(
         || thirty_tokens > 0
         || summary.incomplete_request_count > 0;
     has_usage.then(|| ProviderLocalUsageSummary {
-        today_cost: None,
+        today_cost,
         thirty_day_cost: non_zero_f64(summary.total_cost_usd),
         thirty_day_tokens: non_zero_u64(thirty_tokens),
         period_cost: period_summary.and_then(|s| non_zero_f64(s.total_cost_usd)),
         period_tokens: period_summary.and_then(|s| non_zero_u64(total_tokens(provider_id, s))),
         reporting_period: period.raw(),
-        latest_tokens: None,
+        latest_tokens,
         top_model: top_model(provider_id, summary),
         estimate_note: localized_estimate_note(provider_id, locale::current_language()),
         token_cost_updated_at_ms: current_unix_ms(),

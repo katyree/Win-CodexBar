@@ -155,8 +155,11 @@ fn local_usage_keeps_thirty_day_fixed_while_period_follows_selection() {
         &thirty,
         CostReportingPeriod::MonthToDate,
         Some(&month),
+        (Some(1.25), Some(42)),
     )
     .expect("usage is visible");
+    assert_eq!(summary.today_cost, Some(1.25));
+    assert_eq!(summary.latest_tokens, Some(42));
     assert_eq!(summary.thirty_day_cost, Some(30.0));
     assert_eq!(summary.thirty_day_tokens, Some(3_000));
     assert_eq!(summary.period_cost, Some(5.0));
