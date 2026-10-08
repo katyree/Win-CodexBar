@@ -925,6 +925,12 @@ impl Settings {
         self.enabled_providers.contains(id.cli_name())
     }
 
+    /// Whether a provider belongs in user-facing listings: retired
+    /// (deprecated) providers are shown only while enabled.
+    pub fn is_provider_listed(&self, id: ProviderId) -> bool {
+        !id.is_deprecated() || self.is_provider_enabled(id)
+    }
+
     /// Enable a provider
     pub fn enable_provider(&mut self, id: ProviderId) {
         self.enabled_providers.insert(id.cli_name().to_string());
