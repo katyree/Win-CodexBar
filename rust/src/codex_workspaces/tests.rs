@@ -1,5 +1,7 @@
 //! End-to-end checks for thread names and session ranking in the workspaces snapshot.
 
+mod freshness;
+
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
