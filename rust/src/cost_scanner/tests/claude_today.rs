@@ -17,10 +17,6 @@ fn write_transcript(path: &Path, lines: &[String]) {
     std::fs::write(path, format!("{}\n", lines.join("\n"))).unwrap();
 }
 
-fn day_key(date: NaiveDate) -> String {
-    date.format("%Y-%m-%d").to_string()
-}
-
 fn child_body() {
     use crate::cost_reporting_period::{cost_bucket_zone, set_cost_bucket_zone};
     // UTC+9 with no DST: its midnight never coincides with UTC midnight.
@@ -54,7 +50,7 @@ fn child_body() {
     );
     let today_cost = snapshot.today.cost_usd.expect("priced day has a cost");
     assert!(today_cost > 0.0);
-    let yesterday = day_key(today - Duration::days(1));
+    let yesterday = super::super::today::day_key(today - Duration::days(1));
     assert_eq!(
         snapshot
             .daily_tokens
@@ -85,12 +81,7 @@ fn child_body() {
 
     // C: an unreadable line leaves coverage unknown, so a day without
     // priced usage is unknown rather than a known zero.
-    std::fs::write(
-        project.join("malformed.jsonl"),
-        b"{malformed
-",
-    )
-    .unwrap();
+    std::fs::write(project.join("malformed.jsonl"), b"{malformed\n").unwrap();
     let snapshot = CostScanner::new(30).scan_claude_chart_snapshot_with_cancel(None);
     assert_eq!(snapshot.today.cost_usd, None);
     assert_eq!(snapshot.today.tokens, 0);
@@ -110,9 +101,8 @@ fn claude_today_follows_the_pinned_zone_midnight_in_both_scan_paths() {
         .args(["--exact", test_name, "--nocapture", "--test-threads=1"])
         .env(CHILD_MARKER, "1")
         .env("CLAUDE_CONFIG_DIR", config_dir.path())
-        // Keep the Pi/OMP mirror scan off the real home directory.
-        .env("PI_CODING_AGENT_SESSION_DIR", config_dir.path().join("pi"))
-        .env("OMP_PROFILE", "isolated")
+        // Every home-relative root (claude-swap, Pi, OMP) resolves here.
+        .env("CODEXBAR_TEST_HOME", config_dir.path())
         .output()
         .expect("spawn isolated exact-test child");
     assert!(

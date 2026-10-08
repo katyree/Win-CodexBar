@@ -85,15 +85,25 @@ describe("MenuCard chart refresh", () => {
     });
   });
 
-  it("re-reads chart data when the provider snapshot refreshes, not on a rerender", async () => {
-    const { rerender } = render(card("2026-10-07T23:00:00Z"));
-    await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(1));
+  it("re-reads chart data only when the local day changes across an update", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date(2026, 9, 7, 23, 0, 0));
+      const { rerender } = render(card("2026-10-07T23:00:00Z"));
+      await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(1));
 
-    rerender(card("2026-10-07T23:00:00Z"));
-    expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(1);
+      // Plain rerender and a same-day provider update do not refetch.
+      rerender(card("2026-10-07T23:00:00Z"));
+      vi.setSystemTime(new Date(2026, 9, 7, 23, 30, 0));
+      rerender(card("2026-10-07T23:30:00Z"));
+      expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(1);
 
-    // The next refresh lands after local midnight; Today must be re-read.
-    rerender(card("2026-10-08T00:05:00Z"));
-    await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(2));
+      // The next update lands after local midnight; Today must be re-read.
+      vi.setSystemTime(new Date(2026, 9, 8, 0, 5, 0));
+      rerender(card("2026-10-08T00:05:00Z"));
+      await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(2));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

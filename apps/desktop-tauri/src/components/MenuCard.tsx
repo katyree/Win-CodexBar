@@ -139,8 +139,10 @@ export default function MenuCard({
     setChartData(null);
   }, [provider.providerId, provider.accountEmail]);
 
-  // A new provider snapshot (`updatedAt`) re-reads the local-usage chart, so
-  // "Today" follows the calendar day instead of freezing at the first mount.
+  // Re-read the local-usage chart when the local calendar day changes (seen on
+  // the next render, e.g. a provider update), so "Today" does not freeze at the
+  // first mount without a full transcript walk on every refresh.
+  const localDay = new Date().toLocaleDateString("sv");
   useEffect(() => {
     if (!providerSupportsChartData(provider.providerId)) {
       return;
@@ -162,7 +164,7 @@ export default function MenuCard({
     return () => {
       cancelled = true;
     };
-  }, [provider.providerId, provider.accountEmail, provider.updatedAt, onLayoutChange]);
+  }, [provider.providerId, provider.accountEmail, localDay, onLayoutChange]);
 
   const isWayfinder = provider.providerId === "wayfinder";
   const email = !isWayfinder && provider.accountEmail

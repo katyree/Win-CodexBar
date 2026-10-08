@@ -44,6 +44,9 @@ impl CostScanner {
     /// Rolling(1) is the zone's calendar day (not a trailing 24 hours), so the
     /// one-day scan agrees with today's bucket in the chart snapshot. Other
     /// periods keep [`Self::transcript_window`].
+    ///
+    /// TODO: the simpler end state is `calendar_window` for every period, as
+    /// Codex does (codex/scan.rs); deferred because it moves 30-day boundaries.
     pub(super) fn claude_window(&self, now: DateTime<Utc>) -> ScanWindow {
         if self.period == CostReportingPeriod::Rolling(1) {
             return self.calendar_window(now, None);

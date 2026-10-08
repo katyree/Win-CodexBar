@@ -44,6 +44,18 @@ impl Default for PiScanEvidence {
     }
 }
 
+/// The home directory every cost scan resolves roots against.
+///
+/// Tests set `CODEXBAR_TEST_HOME` (honoured only in test builds) because
+/// `dirs::home_dir` ignores HOME/USERPROFILE on Windows.
+pub(crate) fn scan_home() -> Option<PathBuf> {
+    #[cfg(test)]
+    if let Some(home) = std::env::var_os("CODEXBAR_TEST_HOME") {
+        return Some(PathBuf::from(home));
+    }
+    dirs::home_dir()
+}
+
 /// Session roots to scan: `.pi` and `.omp` under the user home.
 pub fn pi_compatible_session_roots(home: Option<PathBuf>) -> Vec<PathBuf> {
     let Some(home) = home else {
@@ -122,7 +134,7 @@ pub fn scan_pi_compatible_into(
         cutoff,
         cancel,
         seen_entries,
-        pi_compatible_session_roots(dirs::home_dir()),
+        pi_compatible_session_roots(scan_home()),
         Some(target),
     )
 }
@@ -144,7 +156,7 @@ pub fn scan_pi_into(
         cutoff,
         cancel,
         seen_entries,
-        pi_compatible_session_roots(dirs::home_dir()),
+        pi_compatible_session_roots(scan_home()),
         None,
     )
 }
@@ -152,11 +164,7 @@ pub fn scan_pi_into(
 /// Scan standalone Pi/OMP history into daily cost and token buckets.
 pub fn scan_pi_daily(days: u32, cancel: Option<&AtomicBool>) -> PiDailyScan {
     let cutoff = Utc::now() - Duration::days(days as i64);
-    scan_pi_daily_from_roots(
-        cutoff,
-        cancel,
-        pi_compatible_session_roots(dirs::home_dir()),
-    )
+    scan_pi_daily_from_roots(cutoff, cancel, pi_compatible_session_roots(scan_home()))
 }
 
 fn scan_pi_daily_from_roots(
