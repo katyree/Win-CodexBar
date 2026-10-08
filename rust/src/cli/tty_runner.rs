@@ -8,6 +8,7 @@
     reason = "TTY runner types reserved for future interactive session management"
 )]
 
+use super::tty_responder::{ResponderState, ScreenResponder, fire_substring_triggers};
 use crate::process_environment::ProcessEnvironment;
 use regex_lite::Regex;
 use std::collections::HashMap;
@@ -64,6 +65,8 @@ pub struct TtyCommandOptions {
     pub send_enter_every_secs: Option<f64>,
     /// Map of substrings to keys to send when detected
     pub send_on_substrings: HashMap<String, String>,
+    /// Screen-aware responder, consulted on all output since its last answer
+    pub screen_responder: Option<ScreenResponder>,
     /// Stop early when a URL is detected
     pub stop_on_url: bool,
     /// Stop early when any of these substrings are detected
@@ -102,6 +105,7 @@ impl Default for TtyCommandOptions {
             script_line_delay_secs: 0.0,
             send_enter_every_secs: None,
             send_on_substrings: HashMap::new(),
+            screen_responder: None,
             stop_on_url: false,
             stop_on_substrings: Vec::new(),
             settle_after_stop_secs: 0.25,
@@ -184,6 +188,11 @@ impl TtyCommandOptions {
 
     pub fn with_idle_timeout_after_done(mut self, secs: f64) -> Self {
         self.idle_timeout_after_done_secs = Some(secs);
+        self
+    }
+
+    pub fn with_screen_responder(mut self, responder: ScreenResponder) -> Self {
+        self.screen_responder = Some(responder);
         self
     }
 
@@ -426,6 +435,12 @@ impl TtyCommandRunner {
             "tty session: sending script"
         );
 
+        // Output that finished rendering inside the initial delay produces no
+        // later chunk, so triggers must also be checked against it here.
+        fire_substring_triggers(options, &buffer, &mut triggered_sends, &mut writer);
+        let mut responder = ResponderState::default();
+        responder.answer(options, &buffer, &mut writer);
+
         // Send the script if provided. PTYs expect carriage-return line endings
         // for interactive programs to treat writes like pressing Enter.
         let script_lines: Vec<&str> = script
@@ -555,16 +570,11 @@ impl TtyCommandRunner {
                 }
 
                 // Check for send triggers
-                for (trigger, keys) in &options.send_on_substrings {
-                    if !triggered_sends.contains(trigger) && buffer.contains(trigger) {
-                        let normalized = keys.replace('\n', "\r\n");
-                        // Best-effort send-trigger input; a closed PTY drops the write.
-                        let _trigger_written = write!(writer, "{}", normalized);
-                        // Best-effort flush after a send-trigger write.
-                        let _trigger_flushed = writer.flush();
-                        triggered_sends.insert(trigger.clone());
-                    }
-                }
+                fire_substring_triggers(options, &buffer, &mut triggered_sends, &mut writer);
+            }
+
+            if received_output {
+                responder.answer(options, &buffer, &mut writer);
             }
 
             if stopped_early {
@@ -877,6 +887,22 @@ mod tests {
         assert!(script_echoed("❯ /usa\x1b[0mge", &opts));
         assert!(!script_echoed("❯ Try \"fix lint errors\"", &opts));
         assert!(script_echoed("❯ /usage", &opts));
+    }
+
+    /// The trigger text is printed at startup, inside the initial delay, and
+    /// nothing is printed afterwards: the key must still be sent.
+    #[cfg(windows)]
+    #[test]
+    fn trigger_printed_inside_initial_delay_is_still_sent() {
+        let opts = TtyCommandOptions::new()
+            .with_timeout(10.0)
+            .with_idle_timeout(3.0)
+            .with_initial_delay(1.5)
+            .with_send_on_substring("Microsoft Windows", "echo LATE_%OS%\nexit\n");
+        let result = TtyCommandRunner::new()
+            .run("cmd", "", opts)
+            .expect("pty command should run");
+        assert!(result.text.contains("LATE_Windows_NT"), "{}", result.text);
     }
 
     #[test]
