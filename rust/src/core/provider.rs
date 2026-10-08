@@ -623,6 +623,12 @@ impl ProviderId {
     pub fn is_deprecated(&self) -> bool {
         matches!(self, ProviderId::KimiK2 | ProviderId::CrossModel)
     }
+
+    /// Whether a provider belongs in user-facing listings: deprecated providers
+    /// are shown only while enabled.
+    pub fn is_listed(&self, enabled: bool) -> bool {
+        !self.is_deprecated() || enabled
+    }
 }
 
 impl std::fmt::Display for ProviderId {

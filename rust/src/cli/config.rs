@@ -499,6 +499,7 @@ impl ConfigProviderStatus {
 fn provider_statuses(settings: &Settings) -> Vec<ConfigProviderStatus> {
     ProviderId::all()
         .iter()
+        .filter(|id| id.is_listed(settings.is_provider_enabled(**id)))
         .map(|id| ConfigProviderStatus {
             provider: id.cli_name().to_string(),
             display_name: id.display_name().to_string(),
@@ -811,7 +812,13 @@ mod tests {
 
         let statuses = provider_statuses(&settings);
 
-        assert_eq!(statuses.len(), ProviderId::all().len());
+        assert_eq!(
+            statuses.len(),
+            ProviderId::all()
+                .iter()
+                .filter(|p| !p.is_deprecated())
+                .count()
+        );
         let cursor = statuses
             .iter()
             .find(|status| status.provider == "cursor")
@@ -838,6 +845,43 @@ mod tests {
         assert_eq!(value["displayName"], ProviderId::Codex.display_name());
         assert_eq!(value["enabled"], false);
         assert_eq!(value["defaultEnabled"], codex.default_enabled);
+    }
+
+    #[test]
+    fn deprecated_providers_are_hidden_from_config_providers_unless_enabled() {
+        let mut settings = Settings::default();
+        settings.enabled_providers.clear();
+        let statuses = provider_statuses(&settings);
+        for retired in [ProviderId::KimiK2, ProviderId::CrossModel] {
+            assert!(retired.is_deprecated());
+            assert!(statuses.iter().all(|s| s.provider != retired.cli_name()));
+        }
+    }
+
+    #[test]
+    fn deprecated_providers_are_listed_while_enabled() {
+        let mut settings = Settings::default();
+        settings.enabled_providers.clear();
+        settings.enable_provider(ProviderId::KimiK2);
+        let statuses = provider_statuses(&settings);
+        let kimi = statuses
+            .iter()
+            .find(|s| s.provider == "kimik2")
+            .expect("enabled deprecated provider is listed");
+        assert!(kimi.enabled);
+        assert!(statuses.iter().all(|s| s.provider != "crossmodel"));
+    }
+
+    #[test]
+    fn deprecated_providers_still_resolve_by_cli_name() {
+        assert_eq!(
+            ProviderId::from_cli_name("kimik2"),
+            Some(ProviderId::KimiK2)
+        );
+        assert_eq!(
+            ProviderId::from_cli_name("crossmodel"),
+            Some(ProviderId::CrossModel)
+        );
     }
 
     #[test]
