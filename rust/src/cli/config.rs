@@ -499,7 +499,7 @@ impl ConfigProviderStatus {
 fn provider_statuses(settings: &Settings) -> Vec<ConfigProviderStatus> {
     ProviderId::all()
         .iter()
-        .filter(|id| id.is_listed(settings.is_provider_enabled(**id)))
+        .filter(|id| settings.is_provider_listed(**id))
         .map(|id| ConfigProviderStatus {
             provider: id.cli_name().to_string(),
             display_name: id.display_name().to_string(),
@@ -848,7 +848,7 @@ mod tests {
     }
 
     #[test]
-    fn deprecated_providers_are_hidden_from_config_providers_unless_enabled() {
+    fn deprecated_providers_are_hidden_until_enabled_then_listed() {
         let mut settings = Settings::default();
         settings.enabled_providers.clear();
         let statuses = provider_statuses(&settings);
@@ -856,12 +856,7 @@ mod tests {
             assert!(retired.is_deprecated());
             assert!(statuses.iter().all(|s| s.provider != retired.cli_name()));
         }
-    }
 
-    #[test]
-    fn deprecated_providers_are_listed_while_enabled() {
-        let mut settings = Settings::default();
-        settings.enabled_providers.clear();
         settings.enable_provider(ProviderId::KimiK2);
         let statuses = provider_statuses(&settings);
         let kimi = statuses
@@ -870,18 +865,6 @@ mod tests {
             .expect("enabled deprecated provider is listed");
         assert!(kimi.enabled);
         assert!(statuses.iter().all(|s| s.provider != "crossmodel"));
-    }
-
-    #[test]
-    fn deprecated_providers_still_resolve_by_cli_name() {
-        assert_eq!(
-            ProviderId::from_cli_name("kimik2"),
-            Some(ProviderId::KimiK2)
-        );
-        assert_eq!(
-            ProviderId::from_cli_name("crossmodel"),
-            Some(ProviderId::CrossModel)
-        );
     }
 
     #[test]

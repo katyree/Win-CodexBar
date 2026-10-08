@@ -25,11 +25,11 @@ pub(crate) fn build_provider_summaries(settings: &Settings) -> Vec<ProviderSumma
         .iter()
         .filter_map(|id| {
             by_id.get(id).and_then(|p| {
-                let enabled = settings.enabled_providers.contains(id);
                 // Soft-removed providers (upstream #2254) stay hidden unless already enabled.
-                if p.is_deprecated() && !enabled {
+                if !settings.is_provider_listed(**p) {
                     return None;
                 }
+                let enabled = settings.is_provider_enabled(**p);
                 Some(ProviderSummary {
                     id: id.clone(),
                     display_name: p.display_name().to_string(),

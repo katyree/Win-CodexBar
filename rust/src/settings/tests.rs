@@ -509,6 +509,16 @@ fn float_bar_raw_clamps_out_of_range_opacity_on_load() {
 }
 
 #[test]
+fn provider_listing_hides_retired_providers_unless_enabled() {
+    let mut settings = Settings::default();
+    settings.enabled_providers.clear();
+    assert!(!settings.is_provider_listed(ProviderId::KimiK2));
+    settings.enable_provider(ProviderId::KimiK2);
+    assert!(settings.is_provider_listed(ProviderId::KimiK2));
+    assert!(settings.is_provider_listed(ProviderId::Codex));
+}
+
+#[test]
 fn test_settings_provider_enabled() {
     let settings = Settings::default();
     assert!(settings.is_provider_enabled(ProviderId::Claude));
