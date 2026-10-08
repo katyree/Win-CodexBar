@@ -5,7 +5,7 @@ use super::{
 use crate::core::ProviderError;
 use base64::Engine;
 use reqwest::header::HeaderValue;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[test]
 fn saved_account_refresh_errors_distinguish_reauthentication_from_retry() {
@@ -349,67 +349,11 @@ fn parses_retry_after_seconds() {
 }
 
 #[test]
-fn tiny_retry_after_is_floored_and_consecutive_429s_ramp() {
-    let floor = ClaudeOAuthFetcher::DEFAULT_RATE_LIMIT_BACKOFF;
-    assert_eq!(
-        ClaudeOAuthFetcher::bounded_rate_limit_backoff(Duration::from_secs(1), 1),
-        floor
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::bounded_rate_limit_backoff(Duration::from_secs(0), 2),
-        floor * 2
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::bounded_rate_limit_backoff(Duration::from_secs(1), 4),
-        floor * 8
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::bounded_rate_limit_backoff(Duration::from_secs(90 * 60), 1),
-        Duration::from_secs(60 * 60)
-    );
-}
-
-#[test]
-fn expired_rate_limit_gate_resets_consecutive_ramp() {
-    let floor = ClaudeOAuthFetcher::DEFAULT_RATE_LIMIT_BACKOFF;
-    let start = Instant::now();
-    let mut gate = None;
-
-    assert_eq!(
-        ClaudeOAuthFetcher::record_rate_limit_locked(&mut gate, start, Duration::from_secs(1)),
-        floor
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::record_rate_limit_locked(&mut gate, start, Duration::from_secs(1)),
-        floor * 2
-    );
-    assert_eq!(
-        ClaudeOAuthFetcher::record_rate_limit_locked(
-            &mut gate,
-            start + floor * 2 + Duration::from_secs(1),
-            Duration::from_secs(1)
-        ),
-        floor
-    );
-}
-
-#[test]
 fn invalid_retry_after_uses_default_backoff() {
     let header = HeaderValue::from_static("not-a-date");
     let duration = ClaudeOAuthFetcher::retry_after_duration(Some(&header));
 
     assert_eq!(duration, ClaudeOAuthFetcher::DEFAULT_RATE_LIMIT_BACKOFF);
-}
-
-#[test]
-fn rate_limit_gate_blocks_and_clears() {
-    ClaudeOAuthFetcher::clear_rate_limit();
-
-    ClaudeOAuthFetcher::record_rate_limit(Duration::from_secs(30));
-    assert!(ClaudeOAuthFetcher::rate_limit_backoff_remaining().is_some());
-
-    ClaudeOAuthFetcher::clear_rate_limit();
-    assert!(ClaudeOAuthFetcher::rate_limit_backoff_remaining().is_none());
 }
 
 #[test]

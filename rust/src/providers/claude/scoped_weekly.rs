@@ -6,7 +6,7 @@ use crate::core::{NamedRateWindow, RateWindow};
 
 use super::cli_reset::slug_claude_model;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub(super) struct ScopedWeeklyLimit {
     kind: Option<String>,
     group: Option<String>,
@@ -16,12 +16,12 @@ pub(super) struct ScopedWeeklyLimit {
     scope: Option<ScopedWeeklyScope>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ScopedWeeklyScope {
     model: Option<ScopedWeeklyModel>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ScopedWeeklyModel {
     id: Option<String>,
     #[serde(alias = "displayName")]

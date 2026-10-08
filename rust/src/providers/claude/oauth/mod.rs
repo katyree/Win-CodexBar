@@ -7,13 +7,14 @@ use reqwest::Client;
 use reqwest::header::{HeaderValue, RETRY_AFTER};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex, OnceLock};
+use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::core::{NamedRateWindow, ProviderError, ProviderFetchResult, RateWindow, UsageSnapshot};
 
 mod credentials_store;
 mod refresh;
+mod usage_gate;
 
 pub(super) fn clear_account_cache(credential_path: &std::path::Path) {
     credentials_store::clear_cache();
@@ -88,7 +89,7 @@ pub(super) fn auto_resume_identity() -> Option<String> {
 }
 
 /// OAuth usage response from Claude API
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct OAuthUsageResponse {
     #[serde(rename = "fiveHour", alias = "five_hour")]
     pub five_hour: Option<UsageWindow>,
@@ -124,7 +125,7 @@ pub struct OAuthUsageResponse {
 }
 
 /// A usage window from the OAuth API
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct UsageWindow {
     pub utilization: Option<f64>,
 
@@ -133,7 +134,7 @@ pub struct UsageWindow {
 }
 
 /// Extra usage (credits) info
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ExtraUsage {
     #[serde(rename = "isEnabled", alias = "is_enabled")]
     pub is_enabled: Option<bool>,
@@ -164,12 +165,9 @@ pub struct ClaudeOAuthFetcher {
     client: Client,
 }
 
-struct RateLimitGate {
-    until: Instant,
-    consecutive: u32,
-}
-
-static RATE_LIMIT_BACKOFF_UNTIL: OnceLock<Mutex<Option<RateLimitGate>>> = OnceLock::new();
+/// Gate shared with other CodexBar processes through a small file (#775).
+static USAGE_GATE: LazyLock<Mutex<usage_gate::UsageGate<OAuthUsageResponse>>> =
+    LazyLock::new(|| Mutex::new(usage_gate::UsageGate::new(usage_gate::default_path())));
 
 // ── Refresh-token backoff (upstream 0.48.0 #2650) ────────────────────────────
 //
@@ -562,8 +560,15 @@ impl ClaudeOAuthFetcher {
             )));
         }
 
-        if let Some(remaining) = Self::rate_limit_backoff_remaining() {
-            return Err(Self::rate_limited_error(remaining));
+        let fingerprint = usage_gate::token_fingerprint(&credentials.access_token);
+        if let Ok(mut gate) = USAGE_GATE.lock() {
+            match gate.check(usage_gate::now_ms(), &fingerprint) {
+                usage_gate::Decision::Blocked(remaining) => {
+                    return Err(Self::rate_limited_error(remaining));
+                }
+                usage_gate::Decision::Cached(usage) => return Ok(usage),
+                usage_gate::Decision::Proceed => {}
+            }
         }
 
         let response = self
@@ -614,7 +619,10 @@ impl ClaudeOAuthFetcher {
             }
 
             if status.as_u16() == 429 {
-                let backoff = Self::record_rate_limit(retry_after);
+                let backoff = match USAGE_GATE.lock() {
+                    Ok(mut gate) => gate.record_rate_limit(usage_gate::now_ms(), retry_after),
+                    Err(_) => Self::DEFAULT_RATE_LIMIT_BACKOFF,
+                };
                 return Err(Self::rate_limited_error(backoff));
             }
 
@@ -630,69 +638,10 @@ impl ClaudeOAuthFetcher {
             .await
             .map_err(|e| ProviderError::Parse(format!("Failed to parse OAuth response: {}", e)))?;
 
-        Self::clear_rate_limit();
+        if let Ok(mut gate) = USAGE_GATE.lock() {
+            gate.record_success(usage_gate::now_ms(), &fingerprint, usage.clone());
+        }
         Ok(usage)
-    }
-
-    fn rate_limit_gate() -> &'static Mutex<Option<RateLimitGate>> {
-        RATE_LIMIT_BACKOFF_UNTIL.get_or_init(|| Mutex::new(None))
-    }
-
-    fn rate_limit_backoff_remaining() -> Option<Duration> {
-        let mut guard = Self::rate_limit_gate().lock().ok()?;
-        let gate = guard.as_ref()?;
-        let now = Instant::now();
-        if gate.until <= now {
-            *guard = None;
-            None
-        } else {
-            Some(gate.until.saturating_duration_since(now))
-        }
-    }
-
-    /// Anthropic often returns `Retry-After: 0` or `1` on the usage endpoint.
-    /// Honoring that literally re-hits 429 on the next poll and, after a
-    /// last-good miss, the tray maps the generic OAuth error to sign-in.
-    fn bounded_rate_limit_backoff(retry_after: Duration, consecutive: u32) -> Duration {
-        let floor = Self::DEFAULT_RATE_LIMIT_BACKOFF;
-        let cap = Duration::from_secs(60 * 60);
-        let shift = consecutive.saturating_sub(1).min(3);
-        let exponential = floor.saturating_mul(1u32 << shift);
-        retry_after.max(floor).max(exponential).min(cap)
-    }
-
-    fn record_rate_limit(retry_after: Duration) -> Duration {
-        let Ok(mut guard) = Self::rate_limit_gate().lock() else {
-            return Self::bounded_rate_limit_backoff(retry_after, 1);
-        };
-        Self::record_rate_limit_locked(&mut guard, Instant::now(), retry_after)
-    }
-
-    fn record_rate_limit_locked(
-        gate: &mut Option<RateLimitGate>,
-        now: Instant,
-        retry_after: Duration,
-    ) -> Duration {
-        if gate.as_ref().is_some_and(|gate| gate.until <= now) {
-            *gate = None;
-        }
-        let consecutive = gate
-            .as_ref()
-            .map(|gate| gate.consecutive)
-            .unwrap_or(0)
-            .saturating_add(1);
-        let backoff = Self::bounded_rate_limit_backoff(retry_after, consecutive);
-        *gate = Some(RateLimitGate {
-            until: now + backoff,
-            consecutive,
-        });
-        backoff
-    }
-
-    fn clear_rate_limit() {
-        if let Ok(mut guard) = Self::rate_limit_gate().lock() {
-            *guard = None;
-        }
     }
 
     fn retry_after_duration(value: Option<&HeaderValue>) -> Duration {
