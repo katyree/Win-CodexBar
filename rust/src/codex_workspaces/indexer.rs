@@ -11,6 +11,7 @@ use crate::agent_sessions::CodexRolloutFirstLineParser;
 use crate::codex_costs::codex_period_start;
 use crate::core::{CostUsageDayRange, CostUsagePricing, JsonlScanner, sha256_hex};
 
+use super::freshness::is_reusable;
 use super::sidecar::{SidecarError, WorkspaceUsageSidecar};
 use super::thread_names::apply_session_names_and_ranking;
 use super::types::{
@@ -18,9 +19,6 @@ use super::types::{
     ProjectUsage, SessionUsage, SourceStatus, UsageTotals, untitled_session_label,
 };
 use super::{CHATS_DISPLAY_NAME, CHATS_PROJECT_ID};
-
-// Bound reuse so background reads discover new usage without a forced refresh.
-const SNAPSHOT_CACHE_TTL: chrono::Duration = chrono::Duration::minutes(5);
 
 #[derive(Debug, thiserror::Error)]
 pub enum IndexError {
@@ -135,17 +133,6 @@ impl CodexWorkspacesIndex {
         Ok(())
     }
 
-    pub fn load_snapshot<F>(
-        &self,
-        force_refresh: bool,
-        progress: F,
-    ) -> Result<CodexLocalProjectUsageSnapshot, IndexError>
-    where
-        F: FnMut(Progress),
-    {
-        self.load_snapshot_at(force_refresh, progress, Utc::now())
-    }
-
     pub(super) fn load_snapshot_at<F>(
         &self,
         force_refresh: bool,
@@ -163,11 +150,7 @@ impl CodexWorkspacesIndex {
 
         if !force_refresh {
             match sidecar.load_latest_snapshot(scope.scope_signature(), self.history_days) {
-                Ok(Some(mut cached))
-                    if cached.updated_at <= now
-                        && now - cached.updated_at < SNAPSHOT_CACHE_TTL
-                        && zone.date(cached.updated_at) == today =>
-                {
+                Ok(Some(mut cached)) if is_reusable(cached.updated_at, now, &zone) => {
                     cached.source_status = source_status;
                     apply_session_names_and_ranking(
                         &mut cached,
@@ -295,7 +278,7 @@ impl CodexWorkspacesIndex {
             .collect();
 
         let mut snapshot = CodexLocalProjectUsageSnapshot {
-            // Use the scan's calendar instant, including if it crosses midnight.
+            // Scan-start time, so a snapshot that began before midnight counts as yesterday's.
             updated_at: now,
             history_days: self.history_days,
             scope_signature: scope.scope_signature().to_string(),
@@ -381,8 +364,12 @@ impl SessionBucket {
             self.project_display_name = parsed.project_display_name;
             self.project_id = parsed.project_id;
         }
-        self.started_at = min_time(self.started_at, parsed.started_at);
-        self.latest_activity = max_time(self.latest_activity, parsed.latest_activity);
+        self.started_at = self.started_at.into_iter().chain(parsed.started_at).min();
+        self.latest_activity = self
+            .latest_activity
+            .into_iter()
+            .chain(parsed.latest_activity)
+            .max();
         for (model, tokens) in parsed.model_tokens {
             *self.model_tokens.entry(model).or_default() = self
                 .model_tokens
@@ -452,7 +439,7 @@ fn build_projects(sessions: &HashMap<String, SessionBucket>) -> Vec<ProjectUsage
             for b in &buckets {
                 totals.add_assign(&b.totals);
                 cost.add_assign(&b.cost);
-                latest = max_time(latest, b.latest_activity);
+                latest = latest.into_iter().chain(b.latest_activity).max();
                 for (model, tokens) in &b.model_tokens {
                     *model_tokens.entry(model.clone()).or_default() += *tokens;
                 }
@@ -727,24 +714,6 @@ fn non_empty_env(key: &str) -> Option<String> {
 
 fn normalize_path(path: &Path) -> PathBuf {
     fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
-}
-
-fn min_time(a: Option<DateTime<Utc>>, b: Option<DateTime<Utc>>) -> Option<DateTime<Utc>> {
-    match (a, b) {
-        (Some(x), Some(y)) => Some(x.min(y)),
-        (Some(x), None) => Some(x),
-        (None, Some(y)) => Some(y),
-        (None, None) => None,
-    }
-}
-
-fn max_time(a: Option<DateTime<Utc>>, b: Option<DateTime<Utc>>) -> Option<DateTime<Utc>> {
-    match (a, b) {
-        (Some(x), Some(y)) => Some(x.max(y)),
-        (Some(x), None) => Some(x),
-        (None, Some(y)) => Some(y),
-        (None, None) => None,
-    }
 }
 
 fn file_activity_bounds(
