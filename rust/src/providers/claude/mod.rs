@@ -223,7 +223,8 @@ fn load_cached_probe_output(probe_dir: &std::path::Path, login: &str) -> Option<
     let raw = std::fs::read_to_string(probe_dir.join(CLAUDE_PROBE_CACHE_FILE)).ok()?;
     let cache: ClaudeProbeCache = serde_json::from_str(&raw).ok()?;
     let age = unix_now_secs().saturating_sub(cache.captured_at_unix);
-    if login.is_empty()
+    if auto_precision::probe_screen_is_superseded(cache.captured_at_unix)
+        || login.is_empty()
         || cache.login != login
         || age > CLAUDE_PROBE_CACHE_TTL.as_secs()
         || cache.output.trim().is_empty()
@@ -831,7 +832,10 @@ impl Provider for ClaudeProvider {
 
     async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
         match ctx.source_mode {
-            SourceMode::Auto => self.fetch_via_auto(ctx).await,
+            SourceMode::Auto => self
+                .fetch_via_auto(ctx)
+                .await
+                .map(auto_precision::finish_auto_result),
             SourceMode::OAuth => self.fetch_via_oauth(ctx).await,
             SourceMode::Web => self.fetch_via_web(ctx).await,
             SourceMode::Cli => match self.fetch_via_cli(ctx).await {
@@ -919,13 +923,7 @@ impl ClaudeProvider {
             .as_ref()
             .err()
             .is_some_and(oauth_failure_uses_cli_cache);
-        if let Some(mut result) = record_auto_source(&mut failures, "OAuth", oauth_result)? {
-            // Auto may also answer from the CLI, which prints whole percents;
-            // match that precision so the sources do not flip by a point (#776).
-            auto_precision::floor_to_cli_precision(&mut result);
-            // A live OAuth answer supersedes any older cached CLI reading, so a
-            // later rate limit cannot fall back to a staler (lower) value.
-            clear_cli_result_cache();
+        if let Some(result) = record_auto_source(&mut failures, "OAuth", oauth_result)? {
             return Ok(result);
         }
 
@@ -2497,6 +2495,11 @@ Usage:                 0 input, 0 output, 0 cache read
         assert!((cached.usage.primary.used_percent - 42.0).abs() < 0.01);
         assert_eq!(cached.source_label, "cli");
         assert!(!cached.has_successful_claude_cli_quota);
+
+        // A live non-CLI success clears the cache. Same test, because the
+        // global is shared and tests run in parallel without a lock.
+        clear_cli_result_cache();
+        assert!(cached_cli_result().is_none());
     }
 
     #[test]
