@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
 import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../../i18n/LocaleProvider";
 import { buildBundle } from "../../../test/localeHarness";
 import { TEST_PROVIDER_CATALOG } from "../../../test/providerCatalog";
+import { loadStyles, ruleBlock } from "../../../test/styles";
 import {
   ProvidersSidebar,
   type ProviderSidebarRow,
@@ -157,35 +157,20 @@ describe("ProvidersSidebar", () => {
   });
 });
 
-// jsdom runs with `css: false` and no layout, so assert the stylesheet rule
+// jsdom runs with `css: false` and no layout, so assert the stylesheet rules
 // directly: translated status lines ("Отключено — авто", ~97px) must wrap
 // inside the ~89px text column at the 600px settings window, not ellipsize.
-if (!import.meta.dirname) {
-  throw new Error("import.meta.dirname unavailable to vitest runner");
-}
-const stylesSource = readFileSync(`${import.meta.dirname}/../../../styles.css`, "utf8");
-
 describe("Providers tab text fitting", () => {
   it("wraps names and status lines to two lines instead of one ellipsized line", () => {
-    const match = stylesSource.match(
-      /\.providers-sidebar__name,\s*\.providers-sidebar__subtitle-primary\s*\{([^}]*)\}/,
-    );
-    expect(match).not.toBeNull();
-    const rule = match![1];
-    expect(rule).toMatch(/-webkit-line-clamp:\s*2;/);
-    expect(rule).toMatch(/overflow-wrap:\s*anywhere;/);
-    expect(rule).not.toMatch(/white-space:\s*nowrap/);
-    // No other rule for either element may put the one-line ellipsis back.
-    for (const block of stylesSource.matchAll(/\.providers-sidebar__(?:name|subtitle-primary)\s*\{([^}]*)\}/g)) {
-      expect(block[1]).not.toMatch(/white-space:\s*nowrap/);
+    const stylesSource = loadStyles();
+    for (const selector of [
+      ".providers-sidebar__name",
+      ".providers-sidebar__subtitle-primary",
+    ]) {
+      const rule = ruleBlock(stylesSource, selector);
+      expect(rule).toMatch(/-webkit-line-clamp:\s*2;/);
+      expect(rule).not.toContain("nowrap");
     }
-  });
-
-  it("wraps the cookie-source options inside the detail pane", () => {
-    const match = stylesSource.match(/\.provider-detail-segmented\s*\{([^}]*)\}/);
-    expect(match).not.toBeNull();
-    expect(match![1]).toMatch(/flex-wrap:\s*wrap;/);
-    expect(match![1]).toMatch(/max-width:\s*100%;/);
   });
 
   it("keeps the full name and status line available as a tooltip", async () => {

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { TEST_PROVIDER_CATALOG } from "../../test/providerCatalog";
+import { loadStyles } from "../../test/styles";
 import { PROVIDER_ICON_REGISTRY } from "./providerIcons";
 
 // Repository root, from apps/desktop-tauri/src/components/providers.
@@ -28,7 +29,7 @@ function rustBrandColors(): Map<string, string> {
 
 /** `--chart-<id>: rgb(r, g, b);` provider tokens from styles.css, as hex. */
 function chartTokens(): Array<[string, string]> {
-  const css = readFileSync(import.meta.dirname + "/../../styles.css", "utf8");
+  const css = loadStyles();
   const tokens: Array<[string, string]> = [];
   for (const match of css.matchAll(
     /--chart-([a-z0-9]+): rgb\((\d+), (\d+), (\d+)\);/g,

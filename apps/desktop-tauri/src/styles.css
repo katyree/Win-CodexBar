@@ -2349,16 +2349,21 @@ body:has(.tray-panel-reveal) {
   gap: 1px;
 }
 
+/* Long names and translated status lines ("Отключено — авто") wrap to a
+   second line instead of ellipsizing in the narrow sidebar; the row's
+   title attribute carries the full text if even two lines are not enough. */
 .providers-sidebar__name {
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--provider-row-text-primary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
-/* Long names and translated status lines ("Отключено — авто") wrap to a
-   second line instead of ellipsizing in the narrow sidebar; the row's
-   title attribute carries the full text if even two lines are not enough. */
-.providers-sidebar__name,
 .providers-sidebar__subtitle-primary {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -2581,7 +2586,8 @@ body:has(.tray-panel-reveal) {
 .provider-detail-segmented {
   display: inline-flex;
   /* Translated options ("Автоматически / Вручную / Отключено") wrap inside the
-     detail pane instead of running past the 600px window edge. */
+     narrow detail pane instead of overflowing it. Shared by the cookie-source
+     and usage-source controls. */
   flex-wrap: wrap;
   max-width: 100%;
   box-sizing: border-box;

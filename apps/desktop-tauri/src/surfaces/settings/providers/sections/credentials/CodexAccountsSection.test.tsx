@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -25,6 +24,7 @@ const eventMocks = vi.hoisted(() => ({
 vi.mock("../../../../../lib/tauri", () => tauriMocks);
 vi.mock("@tauri-apps/api/event", () => eventMocks);
 
+import { loadStyles, ruleBlock } from "../../../../../test/styles";
 import { CodexAccountsSection } from "./CodexAccountsSection";
 
 const t = (key: string) => key;
@@ -270,22 +270,8 @@ describe("CodexAccountsSection", () => {
 // `css: false`, so styles.css is never applied and computed styles are
 // empty). Assert the stylesheet rules directly instead: these are the exact
 // properties that keep a long account email from painting over the actions
-// row at the fixed 720px settings window. import.meta.dirname (not .url)
-// survives vitest's jsdom transform as the real on-disk directory.
-if (!import.meta.dirname) {
-  throw new Error("import.meta.dirname unavailable to vitest runner");
-}
-const stylesSource = readFileSync(
-  `${import.meta.dirname}/../../../../../styles.css`,
-  "utf8",
-);
-
-function ruleBlock(source: string, selector: string): string {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = source.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
-  expect(match).not.toBeNull();
-  return match![1];
-}
+// row at the fixed 720px settings window.
+const stylesSource = loadStyles();
 
 describe("CodexAccountsSection containment styles", () => {
   it("ellipsizes the info column and pins the actions row inside the card", () => {
