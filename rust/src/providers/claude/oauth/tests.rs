@@ -572,3 +572,51 @@ fn missing_user_profile_scope_recommends_a_usable_credential_source() {
     assert!(forbidden.contains("scope requirement"), "{forbidden}");
     assert!(!forbidden.contains("setup-token"), "{forbidden}");
 }
+
+#[test]
+fn gate_precheck_blocks_with_unchanged_error_and_serves_cache_without_request() {
+    use super::usage_gate::UsageGate;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("CodexBar").join("gate.json");
+    let now = 1_000_000_000_000_i64;
+    let gate = std::sync::Mutex::new(UsageGate::new(Some(path.clone())));
+
+    assert!(ClaudeOAuthFetcher::gate_precheck(&gate, now, "fp").is_none());
+
+    gate.lock().unwrap().record_success(
+        now,
+        "fp",
+        r#"{"fiveHour":{"utilization":42.0,"resetsAt":"2030-01-01T00:00:00Z"}}"#.into(),
+    );
+    let cached = ClaudeOAuthFetcher::gate_precheck(&gate, now + 1000, "fp")
+        .expect("cached")
+        .expect("ok");
+    assert_eq!(cached.five_hour.unwrap().utilization, Some(42.0));
+    assert!(ClaudeOAuthFetcher::gate_precheck(&gate, now + 1000, "other").is_none());
+
+    gate.lock()
+        .unwrap()
+        .record_rate_limit(now + 4 * 60_000, "fp", Duration::ZERO);
+    let err = ClaudeOAuthFetcher::gate_precheck(&gate, now + 5 * 60_000, "fp")
+        .expect("blocked")
+        .unwrap_err();
+    assert!(is_rate_limited_error(&err));
+    assert_eq!(
+        err.to_string(),
+        ClaudeOAuthFetcher::rate_limited_error(Duration::from_secs(240)).to_string()
+    );
+}
+
+#[test]
+fn gate_survives_a_poisoned_mutex() {
+    use super::usage_gate::UsageGate;
+    let gate = std::sync::Arc::new(std::sync::Mutex::new(UsageGate::new(None)));
+    let g2 = gate.clone();
+    let joined = std::thread::spawn(move || {
+        let _guard = g2.lock().unwrap();
+        panic!("poison");
+    })
+    .join();
+    assert!(joined.is_err());
+    assert!(ClaudeOAuthFetcher::gate_precheck(&gate, 1_000_000_000_000, "fp").is_none());
+}

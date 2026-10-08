@@ -89,7 +89,7 @@ pub(super) fn auto_resume_identity() -> Option<String> {
 }
 
 /// OAuth usage response from Claude API
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct OAuthUsageResponse {
     #[serde(rename = "fiveHour", alias = "five_hour")]
     pub five_hour: Option<UsageWindow>,
@@ -125,7 +125,7 @@ pub struct OAuthUsageResponse {
 }
 
 /// A usage window from the OAuth API
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct UsageWindow {
     pub utilization: Option<f64>,
 
@@ -134,7 +134,7 @@ pub struct UsageWindow {
 }
 
 /// Extra usage (credits) info
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct ExtraUsage {
     #[serde(rename = "isEnabled", alias = "is_enabled")]
     pub is_enabled: Option<bool>,
@@ -166,7 +166,7 @@ pub struct ClaudeOAuthFetcher {
 }
 
 /// Gate shared with other CodexBar processes through a small file (#775).
-static USAGE_GATE: LazyLock<Mutex<usage_gate::UsageGate<OAuthUsageResponse>>> =
+static USAGE_GATE: LazyLock<Mutex<usage_gate::UsageGate>> =
     LazyLock::new(|| Mutex::new(usage_gate::UsageGate::new(usage_gate::default_path())));
 
 // ── Refresh-token backoff (upstream 0.48.0 #2650) ────────────────────────────
@@ -561,14 +561,8 @@ impl ClaudeOAuthFetcher {
         }
 
         let fingerprint = usage_gate::token_fingerprint(&credentials.access_token);
-        if let Ok(mut gate) = USAGE_GATE.lock() {
-            match gate.check(usage_gate::now_ms(), &fingerprint) {
-                usage_gate::Decision::Blocked(remaining) => {
-                    return Err(Self::rate_limited_error(remaining));
-                }
-                usage_gate::Decision::Cached(usage) => return Ok(usage),
-                usage_gate::Decision::Proceed => {}
-            }
+        if let Some(result) = Self::gate_precheck(&USAGE_GATE, usage_gate::now_ms(), &fingerprint) {
+            return result;
         }
 
         let response = self
@@ -619,10 +613,10 @@ impl ClaudeOAuthFetcher {
             }
 
             if status.as_u16() == 429 {
-                let backoff = match USAGE_GATE.lock() {
-                    Ok(mut gate) => gate.record_rate_limit(usage_gate::now_ms(), retry_after),
-                    Err(_) => Self::DEFAULT_RATE_LIMIT_BACKOFF,
-                };
+                let backoff = USAGE_GATE
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .record_rate_limit(usage_gate::now_ms(), &fingerprint, retry_after);
                 return Err(Self::rate_limited_error(backoff));
             }
 
@@ -633,15 +627,42 @@ impl ClaudeOAuthFetcher {
             )));
         }
 
-        let usage: OAuthUsageResponse = response
-            .json()
+        let body = response
+            .text()
             .await
-            .map_err(|e| ProviderError::Parse(format!("Failed to parse OAuth response: {}", e)))?;
+            .map_err(|e| ProviderError::Parse(format!("Failed to read OAuth response: {}", e)))?;
+        let usage = Self::parse_usage(&body)?;
 
-        if let Ok(mut gate) = USAGE_GATE.lock() {
-            gate.record_success(usage_gate::now_ms(), &fingerprint, usage.clone());
-        }
+        USAGE_GATE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .record_success(usage_gate::now_ms(), &fingerprint, body);
         Ok(usage)
+    }
+
+    fn parse_usage(body: &str) -> Result<OAuthUsageResponse, ProviderError> {
+        serde_json::from_str(body)
+            .map_err(|e| ProviderError::Parse(format!("Failed to parse OAuth response: {}", e)))
+    }
+
+    /// Gate decision before a request: `Some` answers without a request (rate
+    /// limited, or a recent response served again), `None` lets it proceed.
+    fn gate_precheck(
+        gate: &Mutex<usage_gate::UsageGate>,
+        now_ms: i64,
+        fingerprint: &str,
+    ) -> Option<Result<OAuthUsageResponse, ProviderError>> {
+        let decision = gate
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .check(now_ms, fingerprint);
+        match decision {
+            usage_gate::Decision::Blocked(remaining) => {
+                Some(Err(Self::rate_limited_error(remaining)))
+            }
+            usage_gate::Decision::Cached(body) => Self::parse_usage(&body).ok().map(Ok),
+            usage_gate::Decision::Proceed => None,
+        }
     }
 
     fn retry_after_duration(value: Option<&HeaderValue>) -> Duration {
