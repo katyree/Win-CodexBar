@@ -1,6 +1,6 @@
 [package]
 name = "codexbar"
-version = "0.70.1"
+version = "0.70.2-beta.1"
 edition = "2024"
 authors = ["CodexBar Contributors"]
 description = "Windows and WSL system tray app for monitoring AI provider usage limits"

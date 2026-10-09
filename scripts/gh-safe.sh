@@ -43,8 +43,8 @@ if [[ "${repo,,}" == "steipete/codexbar" ]]; then
 else
   # Winget release step: the fork receives the manifest branch, and the PR opens on microsoft/winget-pkgs.
   case "${repo,,}" in
-    nesszer/win-codexbar|finesssee/winget-pkgs|microsoft/winget-pkgs) ;;
-    *) echo "GitHub writes are not allowlisted for '$repo'. Expected nesszer/Win-CodexBar, Finesssee/winget-pkgs or microsoft/winget-pkgs." >&2; exit 3 ;;
+    katyree/win-codexbar|nesszer/win-codexbar|finesssee/winget-pkgs|microsoft/winget-pkgs) ;;
+    *) echo "GitHub writes are not allowlisted for '$repo'. Expected katyree/Win-CodexBar, nesszer/Win-CodexBar, Finesssee/winget-pkgs or microsoft/winget-pkgs." >&2; exit 3 ;;
   esac
 fi
 

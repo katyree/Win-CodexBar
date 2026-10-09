@@ -20,6 +20,7 @@ import {
 } from "../hooks/useTrayPanelController";
 import { useStayAwakeStatus } from "../hooks/useStayAwakeStatus";
 import MenuCard from "../components/MenuCard";
+import { getProviderIcon } from "../components/providers/providerIcons";
 import MenuSurface, { MenuEmpty } from "../components/MenuSurface";
 import UpdateBanner from "../components/UpdateBanner";
 import ProviderGrid from "../components/ProviderGrid";
@@ -47,6 +48,12 @@ const HAS_STATUS_PAGE = new Set([
   "gemini", "grok", "groq", "kiro", "mistral", "openaiapi",
   "openrouter", "vertexai", "windsurf", "xai",
 ]);
+
+const TRAY_ACCENTS: Record<string, string> = {
+  codex: "#79b6ff",
+  claude: "#ffa88d",
+  copilot: "#c3a3ff",
+};
 
 /**
  * Tray popover surface — two modes like macOS CodexBar:
@@ -133,6 +140,7 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
           provider={p}
           isRefreshing={refreshingProviderIds.has(p.providerId)}
           display={{
+            showProviderIcon: settings.switcherShowsIcons,
             hideEmail: settings.hidePersonalInfo,
             resetTimeRelative: settings.resetTimeRelative,
             showResetWhenExhausted: settings.showResetWhenExhausted,
@@ -142,7 +150,9 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
               selectedProviderId === null && settings.overviewLayout !== "detailed",
             costSummaryDisplayStyle: settings.costSummaryDisplayStyle,
           }}
-          accentColor={settings.providerAccentColors[p.providerId]}
+          accentColor={settings.providerAccentColors[p.providerId]
+            ?? TRAY_ACCENTS[p.providerId]
+            ?? getProviderIcon(p.providerId).brandColor}
           onLayoutChange={requestLayout}
         />
       </div>

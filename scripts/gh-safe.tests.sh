@@ -42,6 +42,14 @@ expect_fail() {
 bash -n "$repo_root/scripts/gh-safe.sh"
 
 bash "$repo_root/scripts/gh-safe.sh" \
+  --repo katyree/Win-CodexBar --verify-kind repo --what-if -- \
+  release create v0.70.2-beta.1 --prerelease >/dev/null
+
+FAKE_GH_MODE=cross expect_fail bash "$repo_root/scripts/gh-safe.sh" \
+  --repo katyree/Win-CodexBar --verify-kind repo --what-if -- \
+  release create v0.70.2-beta.1 --prerelease
+
+bash "$repo_root/scripts/gh-safe.sh" \
   --repo nesszer/Win-CodexBar --verify-kind repo --what-if -- \
   pr create --title test --body test >/dev/null
 

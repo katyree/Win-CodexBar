@@ -20,6 +20,7 @@ import type { DeepSeekPricingStatus } from "../types/bridge";
 import { isUsageItemVisible } from "../lib/usageItemVisibility";
 import { localizeWindowLabel } from "../lib/windowLabels";
 import { useMonthlyLimitBlockNow } from "../hooks/useMonthlyLimitBlockNow";
+import { ProviderIcon } from "./providers/ProviderIcon";
 
 /** Small copy-to-clipboard button matching macOS CopyIconButton (doc.on.doc → checkmark). */
 function CopyIconButton({ text }: { text: string }) {
@@ -49,6 +50,7 @@ function CopyIconButton({ text }: { text: string }) {
 }
 
 export interface MenuCardDisplayOptions {
+  showProviderIcon?: boolean;
   hideEmail: boolean;
   resetTimeRelative: boolean;
   showResetWhenExhausted?: boolean;
@@ -255,7 +257,10 @@ export default function MenuCard({
     <header className="menu-card__header">
       <div className="menu-card__title-row">
         <div className="menu-card__name-group">
-          <span className="menu-card__name">{provider.displayName}</span>
+          <span className="menu-card__identity">
+            {display.showProviderIcon && <ProviderIcon providerId={provider.providerId} size={22} />}
+            <span className="menu-card__name">{provider.displayName}</span>
+          </span>
           {!provider.error && email && <span className="menu-card__email">{email}</span>}
         </div>
         {refreshAction}

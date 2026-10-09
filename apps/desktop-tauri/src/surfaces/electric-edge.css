@@ -1,0 +1,191 @@
+/* Tray-only presentation. Provider fetching, quota values and actions stay in their existing components. */
+.menu-surface--tray {
+  --edge-panel: #0c111b;
+  --edge-card: #131b29;
+  --edge-border: #2a3548;
+  --edge-text: #e8edf7;
+  --edge-muted: #a7b2c7;
+  background: var(--edge-panel);
+  border: 1px solid var(--edge-border);
+  border-radius: 15px;
+  color: var(--edge-text);
+  --text-primary: var(--edge-text);
+  --text-secondary: var(--edge-muted);
+  --text-muted: var(--edge-muted);
+}
+
+[data-theme="light"] .menu-surface--tray {
+  --edge-panel: #f3f6fb;
+  --edge-card: #ffffff;
+  --edge-border: #ccd5e2;
+  --edge-text: #182333;
+  --edge-muted: #536178;
+  background: var(--edge-panel);
+  border: 1px solid var(--edge-border);
+}
+
+.menu-surface--tray .electric-edge__brand {
+  padding: 18px 16px 10px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
+}
+
+.menu-surface--tray .provider-grid {
+  padding: 8px 14px 14px;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.menu-surface--tray .provider-grid__item {
+  border-radius: 7px;
+}
+
+[data-theme="light"] .menu-surface--tray .provider-grid__item .provider-icon {
+  filter: brightness(0);
+}
+
+[data-theme="light"] .menu-surface--tray .provider-grid__item--active .provider-grid__label {
+  color: var(--edge-text);
+}
+
+.menu-surface--tray .menu-stack {
+  padding: 0 12px 12px;
+  gap: 10px;
+}
+
+.menu-surface--tray .menu-stack__column {
+  gap: 10px;
+}
+
+.menu-surface--tray .menu-stack__sep {
+  display: none;
+}
+
+.menu-surface--tray .menu-stack__item,
+.menu-surface--tray .menu-stack__item--selected {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.menu-surface--tray .menu-card {
+  --menu-card-x: 13px;
+  --menu-card-section-y: 13px;
+  --menu-card-header-only-y: 13px;
+  --edge-accent: var(--provider-accent, #79b6ff);
+  border: 1px solid var(--edge-border);
+  border-left: 3px solid var(--edge-accent);
+  border-radius: 4px 10px 10px 4px;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--edge-accent) 12%, var(--edge-card)), var(--edge-card) 85%);
+  overflow: hidden;
+  gap: 10px;
+}
+
+.menu-surface--tray .menu-card__identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.menu-surface--tray .menu-card__identity .provider-icon {
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 6px;
+  color: var(--edge-accent);
+  background: color-mix(in srgb, var(--edge-accent) 14%, transparent);
+}
+
+.menu-surface--tray .menu-card__name-group {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.menu-surface--tray .menu-card__name {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.menu-surface--tray .menu-card__email {
+  max-width: 100%;
+}
+
+.menu-surface--tray .menu-card__subtitle-row {
+  margin-top: 6px;
+}
+
+.menu-surface--tray .menu-card__subtitle,
+.menu-surface--tray .menu-card__plan-badge {
+  font-size: 10px;
+}
+
+.menu-surface--tray .menu-card__divider {
+  background: var(--edge-border);
+  opacity: 0.5;
+}
+
+.menu-surface--tray .menu-metric__title {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.menu-surface--tray .menu-metric__bar {
+  height: 4px;
+  background: color-mix(in srgb, var(--edge-muted) 18%, transparent);
+  border-radius: 4px;
+}
+
+.menu-surface--tray .menu-metric__bar-fill[data-level="normal"] {
+  background: var(--edge-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--edge-accent) 45%, transparent);
+}
+
+.menu-surface--tray .menu-metric__row:not(.menu-metric__reserve):not(.menu-metric__forecast) > .menu-metric__pct {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.menu-surface--tray .menu-metric__reset {
+  font-size: 10px;
+}
+
+.menu-surface--tray .menu-surface__footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--edge-border);
+  background: var(--edge-panel);
+}
+
+.menu-surface--tray .menu-surface__footer-zoom {
+  grid-column: 1 / -1;
+  margin-bottom: 5px;
+}
+
+.menu-surface--tray .menu-surface__footer-row {
+  min-width: 0;
+  font-size: 11px;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-inline: 5px;
+}
+
+.menu-surface--tray .menu-surface__footer-shortcut {
+  font-size: 9px;
+}
+
+.menu-surface--tray button:focus-visible,
+.menu-surface--tray summary:focus-visible,
+.menu-surface--tray input:focus-visible {
+  outline: 2px solid #79b6ff;
+  outline-offset: -2px;
+}
+
+@media (forced-colors: active) {
+  .menu-surface--tray .menu-card {
+    border: 1px solid CanvasText;
+  }
+}

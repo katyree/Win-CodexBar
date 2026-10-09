@@ -42,6 +42,7 @@ export default function MenuSurface({
   const { t } = useLocale();
   return (
     <div className="menu-surface menu-surface--tray" style={style}>
+      <div className="electric-edge__brand">CodexBar</div>
       {banner}
       {summary}
       <div className="menu-surface__body">{children}</div>
