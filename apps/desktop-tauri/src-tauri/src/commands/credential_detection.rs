@@ -23,6 +23,9 @@ pub struct JetbrainsIde {
     pub display_name: String,
     pub path: String,
     pub detected: bool,
+    pub is_custom: bool,
+    pub selected: bool,
+    pub source: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -68,6 +71,7 @@ pub fn get_vertexai_status() -> Result<VertexAiStatus, String> {
 pub fn list_jetbrains_detected_ides() -> Result<Vec<JetbrainsIde>, String> {
     let settings = Settings::load();
     let override_path = settings.jetbrains_ide_base_path().to_string();
+    let central = codexbar::providers::jetbrains::find_central_cli();
 
     let mut entries: Vec<JetbrainsIde> = jetbrains_detected_ide_paths()
         .into_iter()
@@ -81,13 +85,15 @@ pub fn list_jetbrains_detected_ides() -> Result<Vec<JetbrainsIde>, String> {
                 display_name: display,
                 path: p.to_string_lossy().into_owned(),
                 detected: true,
+                is_custom: false,
+                selected: false,
+                source: "local",
             }
         })
         .collect();
 
-    // If the user has an override that isn't already in the detected list,
-    // surface it explicitly with `detected: false`.
-    if !override_path.is_empty() && !entries.iter().any(|e| e.path == override_path) {
+    if !override_path.is_empty() {
+        entries.retain(|entry| entry.path != override_path);
         let path_buf = std::path::PathBuf::from(&override_path);
         let display = path_buf
             .file_name()
@@ -96,9 +102,32 @@ pub fn list_jetbrains_detected_ides() -> Result<Vec<JetbrainsIde>, String> {
         entries.push(JetbrainsIde {
             id: format!("override::{display}").to_lowercase(),
             display_name: display,
-            path: override_path,
-            detected: false,
+            path: override_path.clone(),
+            detected: codexbar::providers::jetbrains::discovery::quota_file(&path_buf).is_some(),
+            is_custom: true,
+            selected: false,
+            source: "local",
         });
+    }
+
+    if let Some(cli) = central {
+        entries.insert(
+            0,
+            JetbrainsIde {
+                id: "central-cli".into(),
+                display_name: "JetBrains Central CLI".into(),
+                path: cli.to_string_lossy().into_owned(),
+                detected: true,
+                is_custom: false,
+                selected: true,
+                source: "cli",
+            },
+        );
+    } else if let Some(entry) = entries
+        .iter_mut()
+        .find(|entry| entry.detected && (override_path.is_empty() || entry.is_custom))
+    {
+        entry.selected = true;
     }
 
     Ok(entries)
@@ -107,15 +136,12 @@ pub fn list_jetbrains_detected_ides() -> Result<Vec<JetbrainsIde>, String> {
 #[tauri::command]
 pub fn set_jetbrains_ide_path(path: String) -> Result<(), String> {
     let trimmed = path.trim();
-    if trimmed.is_empty() {
-        return Err("JetBrains IDE path is empty".to_string());
-    }
     let pb = std::path::PathBuf::from(trimmed);
-    if !pb.is_absolute() {
+    if !trimmed.is_empty() && !pb.is_absolute() {
         return Err("JetBrains IDE path must be absolute".to_string());
     }
-    if !pb.is_dir() {
-        return Err(format!("JetBrains IDE path is not a directory: {trimmed}"));
+    if !trimmed.is_empty() && codexbar::providers::jetbrains::discovery::quota_file(&pb).is_none() {
+        return Err("Select the IDE configuration folder containing options/AIAssistantQuotaManager2.xml, not the AI Assistant log folder. Clear the path to use automatic detection.".into());
     }
     let mut settings = Settings::load();
     settings.set_jetbrains_ide_base_path(pb.to_string_lossy().into_owned());

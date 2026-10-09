@@ -12,18 +12,7 @@ interface Props {
   t: (key: LocaleKey) => string;
 }
 
-/**
- * JetBrains IDE detection.
- *
- * Port of the `ProviderId::JetBrains` branch in
- * `rust/src/native_ui/preferences.rs::render_provider_detail_panel` (~6280).
- *
- * Note: Tauri's folder-picker plugin is not a dependency of this project
- * and the task constraints forbid adding it. The egui `Browse…` affordance
- * is therefore replaced with a free-form "Custom path" text input + a
- * "Save path" button. A "Refresh detection" button re-triggers the
- * provider refresh so new installs surface without restart.
- */
+/** Live Central CLI source and saved IDE quota fallback. */
 export function JetBrainsCreds({ t }: Props) {
   const [ides, setIdes] = useState<JetbrainsIde[]>([]);
   const [customPath, setCustomPath] = useState("");
@@ -34,10 +23,9 @@ export function JetBrainsCreds({ t }: Props) {
     try {
       const next = await listJetbrainsDetectedIdes();
       setIdes(next);
-      // Seed the custom-path field from the current override (entry with
-      // detected=false). Detected IDEs shouldn't overwrite user input.
-      const override = next.find((i) => !i.detected);
-      if (override) setCustomPath(override.path);
+      const override = next.find(ide => ide.isCustom);
+      setCustomPath(override?.path ?? "");
+      setError(null);
     } catch (e) {
       setError(String(e));
     }
@@ -47,9 +35,8 @@ export function JetBrainsCreds({ t }: Props) {
     void reload();
   }, []);
 
-  const anyDetected = ides.some((i) => i.detected);
-  const primaryDetected = ides.find((i) => i.detected);
-  const statusLabel = anyDetected || customPath.trim().length > 0
+  const primaryDetected = ides.find(ide => ide.selected);
+  const statusLabel = primaryDetected
     ? t("CredsStatusDetected")
     : t("CredsStatusNotDetected");
 
@@ -61,6 +48,7 @@ export function JetBrainsCreds({ t }: Props) {
     setBusy(true);
     try {
       await setJetbrainsIdePath(customPath.trim());
+      await refreshProviders();
       await reload();
     } catch (e) {
       setError(String(e));
@@ -93,7 +81,7 @@ export function JetBrainsCreds({ t }: Props) {
 
       {ides.length > 0 && (
         <ul className="provider-detail-list">
-          {ides.map((ide) => (
+          {ides.map(ide => (
             <li key={ide.id} className="provider-detail-list__row">
               <div className="provider-detail-list__main">
                 <div>{ide.displayName}</div>
@@ -104,13 +92,13 @@ export function JetBrainsCreds({ t }: Props) {
                   ? t("CredsStatusDetected")
                   : t("CredsStatusNotDetected")}
               </div>
-              <button
+              {ide.source === "local" && <button
                 type="button"
                 className="btn btn--ghost"
                 onClick={() => handleOpenFolder(ide.path)}
               >
                 {t("CredsOpenFolderAction")}
-              </button>
+              </button>}
             </li>
           ))}
         </ul>
@@ -118,10 +106,10 @@ export function JetBrainsCreds({ t }: Props) {
 
       <div className="provider-detail-helper">
         {primaryDetected
-          ? `${t("CredsJetBrainsHelperDetectedPrefix")} ${primaryDetected.path}.`
-          : customPath.trim().length > 0
-            ? `${t("CredsJetBrainsHelperCustomPrefix")} ${customPath}.`
-            : t("CredsJetBrainsHelperMissing")}
+          ? primaryDetected.source === "cli"
+            ? `${primaryDetected.displayName}: ${primaryDetected.path}`
+            : `${t("CredsJetBrainsHelperDetectedPrefix")} ${primaryDetected.path}.`
+          : t("CredsJetBrainsHelperMissing")}
       </div>
 
       <label className="provider-detail-field">
@@ -133,7 +121,7 @@ export function JetBrainsCreds({ t }: Props) {
           className="provider-detail-field__input"
           value={customPath}
           placeholder={t("CredsJetBrainsCustomPathPlaceholder")}
-          onChange={(e) => setCustomPath(e.target.value)}
+          onChange={e => setCustomPath(e.target.value)}
         />
       </label>
 

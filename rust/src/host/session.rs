@@ -142,26 +142,7 @@ pub fn vertexai_signed_in() -> bool {
 /// Detect JetBrains / Google-IDE configuration directories under the user's
 /// config home. Returns an empty list if none are present.
 pub fn jetbrains_detected_ide_paths() -> Vec<std::path::PathBuf> {
-    let Some(config_dir) = dirs::config_dir() else {
-        return Vec::new();
-    };
-    let roots = [config_dir.join("JetBrains"), config_dir.join("Google")];
-    let mut out = Vec::new();
-    for root in roots {
-        if !root.exists() {
-            continue;
-        }
-        if let Ok(entries) = std::fs::read_dir(root) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.is_dir() {
-                    out.push(p);
-                }
-            }
-        }
-    }
-    out.sort();
-    out
+    crate::providers::jetbrains::discovery::detected_ide_paths()
 }
 
 #[cfg(test)]

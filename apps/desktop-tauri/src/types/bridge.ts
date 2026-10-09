@@ -1049,6 +1049,9 @@ export interface JetbrainsIde {
   displayName: string;
   path: string;
   detected: boolean;
+  isCustom: boolean;
+  selected: boolean;
+  source: "cli" | "local";
 }
 
 export interface KiroStatus {

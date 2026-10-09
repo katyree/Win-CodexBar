@@ -3,17 +3,17 @@
 //! Fetches usage data from JetBrains IDE local configuration
 //! JetBrains AI Assistant stores quota info in XML configuration files
 
-#![allow(
-    dead_code,
-    reason = "JetBrains provider types reserved for future integration"
-)]
+mod central;
+pub mod discovery;
+mod quota;
+
+pub use central::find_central_cli;
 
 use async_trait::async_trait;
-use std::path::PathBuf;
 
 use crate::core::{
     FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
-    RateWindow, SourceMode, UsageSnapshot,
+    SourceMode, UsageSnapshot,
 };
 
 /// JetBrains AI provider
@@ -40,183 +40,29 @@ impl JetBrainsProvider {
         }
     }
 
-    /// Get JetBrains config directory
-    fn get_jetbrains_config_dirs() -> Vec<PathBuf> {
-        let mut dirs = Vec::new();
-
-        // JetBrains stores config in AppData/Roaming on Windows
-        if let Some(config_dir) = dirs::config_dir() {
-            // JetBrains products: IntelliJ IDEA, PyCharm, WebStorm, etc.
-            let products = [
-                "JetBrains/IntelliJIdea*",
-                "JetBrains/PyCharm*",
-                "JetBrains/WebStorm*",
-                "JetBrains/GoLand*",
-                "JetBrains/CLion*",
-                "JetBrains/Rider*",
-                "JetBrains/PhpStorm*",
-                "JetBrains/RubyMine*",
-                "JetBrains/DataGrip*",
-                "JetBrains/DataSpell*",
-                "Google/AndroidStudio*",
-            ];
-
-            for product in products {
-                let base = product.split('*').next().unwrap_or(product);
-                let product_dir = config_dir.join(base);
-                if product_dir.exists() {
-                    // Find versioned subdirectories
-                    if let Ok(entries) = std::fs::read_dir(&product_dir) {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            if path.is_dir() {
-                                dirs.push(path);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        dirs
-    }
-
-    /// Find AI Assistant config file
-    fn find_ai_config_file() -> Option<PathBuf> {
-        let config_dirs = Self::get_jetbrains_config_dirs();
-
-        for config_dir in config_dirs {
-            // AI Assistant config is typically in options/ai.assistant.xml or similar
-            let possible_paths = [
-                config_dir.join("options").join("ai-assistant.xml"),
-                config_dir.join("options").join("aiAssistant.xml"),
-                config_dir.join("options").join("ai.xml"),
-                config_dir
-                    .join("options")
-                    .join("AIAssistantQuotaManager2.xml"),
-            ];
-
-            for path in possible_paths {
-                if path.exists() {
-                    return Some(path);
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Read usage from local XML config
+    /// Read the IDE cache only when the live Central CLI is not installed.
     async fn read_local_config(&self) -> Result<UsageSnapshot, ProviderError> {
-        let config_file = Self::find_ai_config_file().ok_or_else(|| {
-            ProviderError::NotInstalled(
-                "JetBrains AI Assistant not found. Install from JetBrains IDE Marketplace."
-                    .to_string(),
-            )
-        })?;
-
+        let settings = crate::settings::Settings::load();
+        let config_file = discovery::select_quota_file(
+            settings.jetbrains_ide_base_path(),
+            &discovery::detected_ide_paths(),
+        )?;
         let content = tokio::fs::read_to_string(&config_file)
             .await
-            .map_err(|e| ProviderError::Other(format!("Failed to read config: {}", e)))?;
-
-        self.parse_xml_config(&content)
+            .map_err(|_| ProviderError::Other("Failed to read JetBrains AI quota file".into()))?;
+        let mut usage = self.parse_xml_config(&content)?;
+        // Refreshing CodexBar does not refresh the IDE's saved quota.
+        usage.updated_at = std::fs::metadata(&config_file)
+            .and_then(|metadata| metadata.modified())
+            .map(chrono::DateTime::<chrono::Utc>::from)
+            .map_err(|_| {
+                ProviderError::Other("Failed to read JetBrains AI quota timestamp".into())
+            })?;
+        Ok(usage)
     }
 
-    /// Parse JetBrains AI XML config
     fn parse_xml_config(&self, content: &str) -> Result<UsageSnapshot, ProviderError> {
-        // Parse XML to extract quota info
-        // JetBrains AI stores quota as:
-        // <component name="AiAssistant">
-        //   <option name="usedCredits" value="123" />
-        //   <option name="creditLimit" value="1000" />
-        // </component>
-
-        let quota = Self::parse_quota_values(content);
-        Ok(Self::usage_from_quota(quota))
-    }
-
-    fn parse_quota_values(content: &str) -> JetBrainsQuota {
-        let mut quota = JetBrainsQuota::default();
-
-        // Simple XML parsing (not using full XML parser to avoid dependency)
-        for line in content.lines().map(str::trim) {
-            quota.apply_xml_line(line);
-        }
-
-        quota
-    }
-
-    fn usage_from_quota(quota: JetBrainsQuota) -> UsageSnapshot {
-        UsageSnapshot::new(RateWindow::new(quota.used_percent())).with_login_method("JetBrains AI")
-    }
-
-    /// Extract numeric value from XML attribute
-    fn extract_xml_value(line: &str) -> Option<f64> {
-        // Look for value="123" pattern
-        if let Some(start) = line.find("value=\"") {
-            let rest = &line[start + 7..];
-            if let Some(end) = rest.find('"') {
-                let value_str = &rest[..end];
-                return value_str.parse().ok();
-            }
-        }
-        None
-    }
-
-    /// Check if JetBrains AI is installed
-    fn is_installed() -> bool {
-        Self::find_ai_config_file().is_some()
-    }
-}
-
-struct JetBrainsQuota {
-    used_credits: f64,
-    credit_limit: f64,
-}
-
-impl Default for JetBrainsQuota {
-    fn default() -> Self {
-        Self {
-            used_credits: 0.0,
-            credit_limit: 1000.0,
-        }
-    }
-}
-
-impl JetBrainsQuota {
-    fn apply_xml_line(&mut self, line: &str) {
-        if Self::is_used_credits_line(line)
-            && let Some(value) = JetBrainsProvider::extract_xml_value(line)
-        {
-            self.used_credits = value;
-        }
-
-        if Self::is_credit_limit_line(line)
-            && let Some(value) = JetBrainsProvider::extract_xml_value(line)
-        {
-            self.credit_limit = value;
-        }
-    }
-
-    fn is_used_credits_line(line: &str) -> bool {
-        line.contains("usedCredits")
-            || line.contains("used_credits")
-            || line.contains("creditsUsed")
-    }
-
-    fn is_credit_limit_line(line: &str) -> bool {
-        line.contains("creditLimit")
-            || line.contains("credit_limit")
-            || line.contains("creditsLimit")
-            || line.contains("monthlyLimit")
-    }
-
-    fn used_percent(&self) -> f64 {
-        if self.credit_limit > 0.0 {
-            (self.used_credits / self.credit_limit) * 100.0
-        } else {
-            0.0
-        }
+        quota::parse(content)
     }
 }
 
@@ -241,6 +87,10 @@ impl Provider for JetBrainsProvider {
 
         match ctx.source_mode {
             SourceMode::Auto | SourceMode::Cli => {
+                if let Some(cli) = find_central_cli() {
+                    let usage = central::fetch(&cli, ctx.web_timeout).await?;
+                    return Ok(ProviderFetchResult::new(usage, "cli"));
+                }
                 let usage = self.read_local_config().await?;
                 Ok(ProviderFetchResult::new(usage, "local"))
             }
@@ -279,6 +129,43 @@ impl Provider for JetBrainsProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_quota_info_and_next_refill_from_ide_xml() {
+        let xml = r#"<application><component name="AIAssistantQuotaManager2">
+          <option name="quotaInfo" value="{&quot;type&quot;:&quot;Available&quot;,&quot;current&quot;:&quot;250&quot;,&quot;maximum&quot;:&quot;1000&quot;,&quot;until&quot;:&quot;2027-08-31T23:59:59Z&quot;}" />
+          <option name="nextRefill" value="{&quot;type&quot;:&quot;Known&quot;,&quot;next&quot;:&quot;2026-10-31T23:59:59Z&quot;}" />
+        </component></application>"#;
+        let usage = JetBrainsProvider::new().parse_xml_config(xml).unwrap();
+        assert_eq!(usage.primary.used_percent, 25.0);
+        assert_eq!(
+            usage.primary.resets_at.unwrap().to_rfc3339(),
+            "2026-10-31T23:59:59+00:00"
+        );
+    }
+
+    #[test]
+    fn missing_quota_is_an_error_instead_of_zero_usage() {
+        assert!(
+            JetBrainsProvider::new()
+                .parse_xml_config(r#"<application><component name="AiAssistant" /></application>"#)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn reads_numeric_quota_json_with_xml_newlines_and_legacy_credit_options() {
+        let provider = JetBrainsProvider::new();
+        let current = provider.parse_xml_config(
+            r#"<option value='{&#10;"type":"Available","current":30,"maximum":200}' name='quotaInfo' />"#,
+        ).unwrap();
+        assert_eq!(current.primary.used_percent, 15.0);
+        assert!(current.primary.resets_at.is_none());
+        let legacy = provider.parse_xml_config(
+            r#"<option name="usedCredits" value="30"/><option name="creditLimit" value="200"/>"#,
+        ).unwrap();
+        assert_eq!(legacy.primary.used_percent, 15.0);
+    }
 
     #[test]
     fn plugin_presence_maps_to_local_runtime_offline() {

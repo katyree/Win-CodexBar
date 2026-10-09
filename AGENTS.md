@@ -82,6 +82,7 @@ pnpm run tauri:build
 - Cookie import UX uses **explicit browser selection** in Preferences — do not assume Chrome-only.
 - Claude CLI output is user-configurable; do not treat a customizable status line as the usage source of truth.
 - Keep provider data siloed: never show identity / plan / email from provider A in provider B UI.
+- JetBrains AI: prefer `central limit --json`; IDE XML is a cached fallback only when Central is absent. Preserve its file timestamp. Source selection and quota fields are documented in `docs/PROVIDERS.md`.
 - Secrets (manual cookies, API keys, token accounts): use existing redaction, `secure_file`, and keyring helpers.
 - Do not add dependencies or tooling without confirmation.
 - Do not open issues or PRs against upstream `steipete/CodexBar` unless the user explicitly asks. This repo is Win-CodexBar only.

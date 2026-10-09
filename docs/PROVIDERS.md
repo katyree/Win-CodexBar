@@ -38,6 +38,29 @@ CLI: `codexbar usage --source auto|web|cli|oauth`.
 
 Auth resolution helpers in `rust/src/providers/` commonly try: explicit settings → keyring/entry → environment variables (exact order is provider-specific).
 
+### JetBrains AI usage
+
+Auto and CLI modes prefer `central limit --json` when JetBrains Central is
+installed on PATH or in `~/.local/bin`. Central supplies live account credit
+usage and the next refill date. Sign-in stays with Central; CodexBar does not
+copy its credentials. A failed Central request is reported as an error.
+
+When Central is absent, CodexBar reads the IDE's saved quota. Automatic
+detection selects the most recently modified quota file under versioned
+JetBrains or Android Studio configuration folders. The custom path overrides
+this cache selection and accepts the IDE configuration folder or its `options`
+folder. It does not accept `ai-assistant-log-data`. Save an empty path to restore
+automatic detection.
+
+The IDE cache stores `quotaInfo` JSON inside `AIAssistantQuotaManager2.xml`.
+`current / maximum` is the used percentage. `nextRefill.next` supplies the refill
+date; `quotaInfo.until` is validity, not the refill date. Cached readings retain
+the file's modification time. Refreshing CodexBar does not refresh that file.
+
+To compare monthly quota, use `central limit` or Junie's **License & quota**
+view. Junie's **All-time** view reports local project activity over a different
+period.
+
 ### Devin manual authentication
 
 On Windows, Devin uses a manually pasted Bearer token; Chrome-session import is
