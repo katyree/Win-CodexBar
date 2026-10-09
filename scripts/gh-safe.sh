@@ -83,7 +83,12 @@ case "$verify_kind" in
     ;;
   pr) verified_url="$(gh pr view "$target" --repo "$repo" --json url --jq .url)" ;;
   issue) verified_url="$(gh issue view "$target" --repo "$repo" --json url --jq .url)" ;;
-  release) verified_url="$(gh api "repos/$repo/releases/tags/$target" --jq .html_url)" ;;
+  release)
+    readback="$(gh release view "$target" --repo "$repo" --json url,tagName,isDraft --jq '[.url, .tagName, (.isDraft | tostring)] | join("|")')"
+    IFS='|' read -r verified_url release_tag release_is_draft <<< "$readback"
+    [[ "$release_tag" == "$target" ]] || { echo "GitHub release tag mismatch: '$release_tag' != '$target'." >&2; exit 4; }
+    [[ "$release_is_draft" == true || "$release_is_draft" == false ]] || { echo 'Invalid release draft status.' >&2; exit 4; }
+    ;;
 esac
 
 expected_prefix="https://github.com/$repo/"
@@ -92,7 +97,13 @@ shopt -s nocasematch
 case "$verify_kind" in
   pr) [[ "$verified_url" == *"/pull/$target" ]] || { echo "GitHub target mismatch: '$verified_url' does not end with '/pull/$target'." >&2; exit 4; } ;;
   issue) [[ "$verified_url" == *"/issues/$target" ]] || { echo "GitHub target mismatch: '$verified_url' does not end with '/issues/$target'." >&2; exit 4; } ;;
-  release) [[ "$verified_url" == *"/releases/tag/$target" ]] || { echo "GitHub target mismatch: '$verified_url' does not end with '/releases/tag/$target'." >&2; exit 4; } ;;
+  release)
+    if [[ "$release_is_draft" == true ]]; then
+      [[ "$verified_url" == "$expected_prefix"releases/tag/untagged-* || "$verified_url" == "$expected_prefix"releases/tag/"$target" ]] || { echo "Invalid draft release URL: '$verified_url'." >&2; exit 4; }
+    else
+      [[ "$verified_url" == "$expected_prefix"releases/tag/"$target" ]] || { echo "GitHub release URL mismatch: '$verified_url'." >&2; exit 4; }
+    fi
+    ;;
 esac
 shopt -u nocasematch
 

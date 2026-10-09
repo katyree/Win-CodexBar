@@ -22,6 +22,13 @@ elif [[ "${1:-}" == pr && "${2:-}" == view ]]; then
   printf '%s\n' 'https://github.com/nesszer/Win-CodexBar/pull/361'
 elif [[ "${1:-}" == issue && "${2:-}" == view ]]; then
   printf '%s\n' 'https://github.com/nesszer/Win-CodexBar/issues/123'
+elif [[ "${1:-}" == release && "${2:-}" == view ]]; then
+  case "${FAKE_GH_MODE:-ok}" in
+    draft) printf '%s\n' "https://github.com/katyree/Win-CodexBar/releases/tag/untagged-test|${3:?}|true" ;;
+    draft_wrong_tag) printf '%s\n' 'https://github.com/katyree/Win-CodexBar/releases/tag/untagged-test|wrong-tag|true' ;;
+    draft_cross) printf '%s\n' "https://github.com/steipete/CodexBar/releases/tag/untagged-test|${3:?}|true" ;;
+    *) printf '%s\n' "https://github.com/nesszer/Win-CodexBar/releases/tag/${3:?}|${3:?}|false" ;;
+  esac
 elif [[ "${1:-}" == api ]]; then
   if [[ "${2:-}" == repos/nesszer/Win-CodexBar/releases/tags/v1.2.3 ]]; then
     printf '%s\n' 'https://github.com/nesszer/Win-CodexBar/releases/tag/v1.2.3'
@@ -138,5 +145,15 @@ bash "$repo_root/scripts/gh-safe.sh" \
 bash "$repo_root/scripts/gh-safe.sh" \
   --repo nesszer/Win-CodexBar --verify-kind release --target v1.2.3 --what-if -- \
   release upload v1.2.3 dist/app.zip >/dev/null
+
+FAKE_GH_MODE=draft bash "$repo_root/scripts/gh-safe.sh" \
+  --repo katyree/Win-CodexBar --verify-kind release --target electric-edge-v0.70.2-beta.1 --what-if -- \
+  release upload electric-edge-v0.70.2-beta.1 dist/app.exe >/dev/null
+
+for mode in draft_wrong_tag draft_cross; do
+  FAKE_GH_MODE="$mode" expect_fail bash "$repo_root/scripts/gh-safe.sh" \
+    --repo katyree/Win-CodexBar --verify-kind release --target electric-edge-v0.70.2-beta.1 --what-if -- \
+    release upload electric-edge-v0.70.2-beta.1 dist/app.exe
+done
 
 echo 'GitHub write-safety shell tests passed.'
