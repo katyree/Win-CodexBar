@@ -14,6 +14,15 @@
 - Use expanded, collapsible Claude and Codex account sections with Add account below the rows; keep the floating bar's usage footprint when authentication expires.
 - Let the tray panel be moved and resized again: drag the strip along its top to move it (the spot is remembered; double-click returns it next to the tray), resize from any edge or corner, and stop it from closing when a resize starts on its outer frame. Its remembered size is now kept in logical pixels, so it fits monitors with different scaling (a size saved by an earlier version is reset to the automatic size once).
 
+## [Windows] 0.70.1 - 2026-10-09
+
+### Fixed
+
+- Read live JetBrains AI credits and refill dates through JetBrains Central CLI.
+- Detect versioned IDE quota files, honor the saved-cache custom path, and preserve cache timestamps.
+- Parse JetBrains quota JSON embedded in XML and report missing quota instead of false zero usage.
+- Keep the Windows release runtime fully static by disabling Tauri's conflicting UCRT linker override.
+
 ## [Windows] 0.70.0 - 2026-10-03
 
 Windows port of upstream CodexBar **0.60.3 → 0.70.0**: every provider, cost/usage, privacy, tray, CLI and reliability port from upstream 0.60.4 through 0.70.0 integrated across the release branch, plus six community pull requests and fixes for open issues. This is also the first release to ship the changes in the unreleased 0.61.0 changelog section.

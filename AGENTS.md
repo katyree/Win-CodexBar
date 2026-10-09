@@ -65,6 +65,7 @@ pnpm run tauri:build
 ```
 
 - Raw `cargo build --release` on the Tauri crate can still embed the **dev URL**. Prefer `pnpm run tauri:build` / `tauri:build:debug` or `scripts/dev.ps1`.
+- Windows releases use `RUSTFLAGS=-C target-feature=+crt-static` with `STATIC_VCRUNTIME=false`; Tauri's own static-VCRuntime override otherwise links UCRT dynamically. Verify with `scripts/verify-windows-executables.ps1`.
 - Binaries: `codexbar.exe` (CLI), `codexbar-desktop-tauri.exe` (desktop).
 - Default desktop work runs from the repo root (default-member). Use `cd rust` only for CLI/backend-only focus.
 - There is no active root `Scripts/` (capital S) pipeline — use `scripts/`.

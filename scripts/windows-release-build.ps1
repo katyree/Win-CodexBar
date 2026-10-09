@@ -283,6 +283,8 @@ try {
     # start without the Visual C++ Redistributable (#761). With an explicit
     # --target, RUSTFLAGS does not reach build scripts or proc macros.
     $crtStaticFlag = "-C target-feature=+crt-static"
+    # Tauri's override links UCRT dynamically; let Rust's +crt-static own all CRT linking.
+    $env:STATIC_VCRUNTIME = "false"
     if ("$env:RUSTFLAGS" -notmatch [regex]::Escape($crtStaticFlag)) {
         $env:RUSTFLAGS = ("$env:RUSTFLAGS $crtStaticFlag").Trim()
     }
