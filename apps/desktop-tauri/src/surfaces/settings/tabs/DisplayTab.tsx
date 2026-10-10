@@ -13,15 +13,21 @@ import FloatBarSettingsSection from "../../../floatbar/SettingsSection";
 import SwitcherShortcutsSection from "../SwitcherShortcutsSection";
 import { getTrayVisibilityStatus } from "../../../lib/tauri";
 
+export type MenuSection = "tray" | "floating" | "shortcuts";
+
 export default function DisplayTab({
   mode = "menu",
   settings,
   set,
   saving,
   providers = [],
+  menuSection = "tray",
+  onMenuSectionChange,
 }: TabProps & {
   mode?: "menuBar" | "menu";
   providers?: ProviderCatalogEntry[];
+  menuSection?: MenuSection;
+  onMenuSectionChange?: (section: MenuSection) => void;
 }) {
   const { t } = useLocale();
   const [trayVisibility, setTrayVisibility] = useState<TrayVisibilityStatusDto | null>(null);
@@ -41,6 +47,18 @@ export default function DisplayTab({
   }));
   return (
     <>
+      {mode === "menu" && (
+        <div className="settings-menu-sections" role="group" aria-label={t("TabMenu")}>
+          {([
+            { id: "tray", label: t("SettingsMenuTray") },
+            { id: "floating", label: t("FloatBarSectionTitle") },
+            { id: "shortcuts", label: t("SettingsMenuShortcuts") },
+          ] satisfies { id: MenuSection; label: string }[]).map(section => (
+            <button type="button" key={section.id} aria-pressed={menuSection === section.id}
+              onClick={() => onMenuSectionChange?.(section.id)}>{section.label}</button>
+          ))}
+        </div>
+      )}
       {/* ── Menu bar ─────────────────────────────────────────────── */}
       {mode === "menuBar" && <section className="settings-section">
         <h3 className="settings-section__title">{t("MenuBar")}</h3>
@@ -177,8 +195,8 @@ export default function DisplayTab({
       </section>}
 
       {/* ── Menu content ─────────────────────────────────────────── */}
-      {mode === "menu" && <section className="settings-section">
-        <h3 className="settings-section__title">{t("TabMenu")}</h3>
+      {mode === "menu" && menuSection === "tray" && <section className="settings-section">
+        <h3 className="settings-section__title">{t("SettingsMenuTray")}</h3>
         <div className="settings-section__group">
           <Field
             label={t("TrayPanelAlwaysOnTopLabel")}
@@ -262,11 +280,11 @@ export default function DisplayTab({
         </div>
       </section>}
 
-      {mode === "menu" && (
+      {mode === "menu" && menuSection === "shortcuts" && (
         <SwitcherShortcutsSection settings={settings} saving={saving} set={set} />
       )}
 
-      {mode === "menu" && (
+      {mode === "menu" && menuSection === "floating" && (
         <FloatBarSettingsSection settings={settings} saving={saving} set={set} />
       )}
     </>

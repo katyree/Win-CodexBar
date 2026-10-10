@@ -127,3 +127,22 @@
   .settings .settings-section { border: 1px solid CanvasText; }
   .settings .settings-tab--active { border-left-color: Highlight; }
 }
+.settings .settings-sidebar { grid-column: 1; grid-row: 2 / 4; min-height: 0; overflow: auto; background: var(--edge-sidebar); border-right: 1px solid var(--edge-border); }
+.settings .settings-brand { padding: 22px 20px 16px; font-size: 16px; font-weight: 650; }
+.settings .settings-tabs { padding: 8px 10px 20px; border: 0; overflow: visible; }
+.settings .settings-tabs::before { content: none; }
+.settings-search { display: flex; position: relative; margin: 0 10px 8px; }
+.settings-search input { width: 100%; min-width: 0; padding: 9px 24px 9px 8px; font-size: 11px; border: 1px solid var(--edge-border); border-radius: 7px; background: var(--edge-panel); color: var(--text-primary); }
+.settings-search input::-webkit-search-cancel-button { display: none; }
+.settings-search button { position: absolute; right: 2px; top: 2px; bottom: 2px; background: transparent; border: 0; color: var(--text-secondary); padding: 0 5px; }
+.settings-search-results > p { color: var(--text-secondary); }
+.settings-search-results > button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 18px; background: var(--edge-card); border: 1px solid var(--edge-border); border-left: 3px solid #79b6ff; border-radius: 8px; color: var(--text-primary); text-align: left; }
+.settings-search-results small { color: var(--text-secondary); }
+.settings-menu-sections { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 20px; }
+.settings-menu-sections button, .settings-size-presets button { background: var(--edge-panel); color: var(--text-secondary); border: 1px solid var(--edge-border); border-radius: 7px; padding: 10px 12px; }
+.settings-menu-sections button[aria-pressed="true"], .settings-size-presets button[aria-pressed="true"] { background: color-mix(in srgb, #79b6ff 15%, var(--edge-panel)); border-color: #79b6ff; color: var(--text-primary); }
+.settings-size-presets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.settings-size-presets small { display: block; margin-top: 5px; font-size: 10px; color: var(--text-secondary); }
+.settings-size-custom { color: var(--text-secondary); font-size: 11px; }
+.settings button:focus-visible, .settings-search input:focus-visible { outline: 2px solid #79b6ff; outline-offset: 2px; }
+.settings-size-presets button:disabled { opacity: .5; cursor: default; }

@@ -116,6 +116,24 @@ export default function FloatBarSettingsSection({ settings, saving, set }: Props
             aria-label={t("FloatBarOpacityAriaLabel")}
           />
         </Field>
+        <Field label={t("FloatBarSizePreset")} description={t("FloatBarSizePresetHelper")}>
+          <div className="settings-size-presets" role="group" aria-label={t("FloatBarSizePreset")}>
+            {[{ value: 75, label: t("DisplayModeCompact") }, { value: 100, label: t("FloatBarComfortable") }].map(preset => (
+              <button
+                key={preset.value}
+                type="button"
+                aria-pressed={settings.floatBarScale === preset.value}
+                disabled={saving || !settings.floatBarEnabled}
+                onClick={() => { scale.setDraft(preset.value); set({ floatBarScale: preset.value }); }}
+              >
+                {preset.label}<small>{preset.value}%</small>
+              </button>
+            ))}
+            {settings.floatBarScale !== 75 && settings.floatBarScale !== 100 && (
+              <span className="settings-size-custom">{t("FloatBarCustomSize")} / {settings.floatBarScale}%</span>
+            )}
+          </div>
+        </Field>
         <Field
           label={`${t("FloatBarSize")} (${scale.draft}%)`}
           description={t("FloatBarSizeHelper")}

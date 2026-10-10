@@ -14,6 +14,14 @@
 - Use expanded, collapsible Claude and Codex account sections with Add account below the rows; keep the floating bar's usage footprint when authentication expires.
 - Let the tray panel be moved and resized again: drag the strip along its top to move it (the spot is remembered; double-click returns it next to the tray), resize from any edge or corner, and stop it from closing when a resize starts on its outer frame. Its remembered size is now kept in logical pixels, so it fits monitors with different scaling (a size saved by an earlier version is reset to the automatic size once).
 
+## [Windows] 0.70.2-beta.3 - 2026-10-10
+
+### Improved
+
+- Add Compact (75%) and Comfortable (100%) floating-bar size presets while retaining custom scaling.
+- Add Settings search across translated labels and provider names, with direct navigation to matching pages and Menu sections.
+- Split Menu settings into Tray appearance, Floating Bar, and Shortcuts sections.
+
 ## [Windows] 0.70.2-beta.2 - 2026-10-10
 
 ### Improved

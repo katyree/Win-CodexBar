@@ -1418,3 +1418,14 @@ DurationDays = { "{}" }d
 DurationHours = { "{}" }h
 DurationMinutes = { "{}" }m
 DurationMonths = { "{}" } mo
+
+SettingsSearchPlaceholder = Search settings
+SettingsSearchClear = Clear settings search
+SettingsSearchEmpty = No settings found. Try a different word.
+SettingsSearchResults = Search results
+SettingsMenuTray = Tray appearance
+SettingsMenuShortcuts = Shortcuts
+FloatBarSizePreset = Size preset
+FloatBarSizePresetHelper = Choose a size, or fine-tune it with the slider below.
+FloatBarComfortable = Comfortable
+FloatBarCustomSize = Custom

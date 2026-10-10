@@ -934,6 +934,16 @@ export const ALL_LOCALE_KEYS = [
   "TrayResetsDueNow",
 
   // Tauri desktop shell — FloatBar settings section
+  "SettingsSearchPlaceholder",
+  "SettingsSearchClear",
+  "SettingsSearchEmpty",
+  "SettingsSearchResults",
+  "SettingsMenuTray",
+  "SettingsMenuShortcuts",
+  "FloatBarSizePreset",
+  "FloatBarSizePresetHelper",
+  "FloatBarComfortable",
+  "FloatBarCustomSize",
   "FloatBarSectionTitle",
   "FloatBarShowFloatingBar",
   "FloatBarShowFloatingBarHelper",

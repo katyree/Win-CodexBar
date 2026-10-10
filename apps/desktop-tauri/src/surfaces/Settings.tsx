@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type {
@@ -10,9 +10,10 @@ import { useSettings } from "../hooks/useSettings";
 import { useSurfaceTarget } from "../hooks/useSurfaceMode";
 import { useLocale } from "../hooks/useLocale";
 import { closeSettingsWindow, getWorkAreaRect, setSurfaceMode } from "../lib/tauri";
+import { searchSettings, type SettingsSearchTarget } from "./settings/settingsSearch";
 import { TAB_META, isSettingsTab } from "./settings/settingsTabs";
 import GeneralTab from "./settings/tabs/GeneralTab";
-import DisplayTab from "./settings/tabs/DisplayTab";
+import DisplayTab, { type MenuSection } from "./settings/tabs/DisplayTab";
 import AdvancedTab from "./settings/tabs/AdvancedTab";
 import AboutTab from "./settings/tabs/AboutTab";
 import ProvidersTab from "./settings/tabs/ProvidersTab";
@@ -146,6 +147,10 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
       : shellTarget?.kind === "settings" && isSettingsTab(shellTarget.tab)
         ? shellTarget.tab
         : "general";
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
+  const [menuSection, setMenuSection] = useState<MenuSection>("tray");
+  const searchResults = searchSettings(query, t, state.providers.map(provider => provider.displayName));
   const [activeTab, setActiveTab] = useState<SettingsTabId>(initialTab);
   const shellTab: SettingsTabId | null =
     shellTarget?.kind === "settings" && isSettingsTab(shellTarget.tab)
@@ -172,14 +177,24 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
     void applySettingsWindowSize();
   }, []);
 
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [activeTab, menuSection, Boolean(query.trim())]);
+
   const set = (patch: SettingsUpdate) => void update(patch);
   const handleTabClick = useCallback((tab: SettingsTabId) => {
+    setQuery("");
     setActiveTab(tab);
     // Only transition the main window if we're NOT in the detached settings window
     if (getCurrentWebviewWindow().label !== "settings") {
       void setSurfaceMode("settings", { kind: "settings", tab });
     }
   }, []);
+
+  const openSearchResult = (target: SettingsSearchTarget) => {
+    if (target.menuSection) setMenuSection(target.menuSection);
+    handleTabClick(target.tab);
+  };
 
   return (
     <div
@@ -211,6 +226,18 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
       </div>
 
       {/* tab bar */}
+      <aside className="settings-sidebar">
+      <div className="settings-brand">CodexBar</div>
+      <form className="settings-search" role="search" onSubmit={event => {
+        event.preventDefault();
+        const first = searchResults[0];
+        if (first) openSearchResult(first);
+      }}>
+        <input type="search" value={query} aria-label={t("SettingsSearchPlaceholder")}
+          placeholder={t("SettingsSearchPlaceholder")} onChange={event => setQuery(event.target.value)}
+          onKeyDown={event => { if (event.key === "Escape") setQuery(""); }} />
+        {query && <button type="button" onClick={() => setQuery("")} aria-label={t("SettingsSearchClear")}>×</button>}
+      </form>
       <nav className="settings-tabs" role="tablist" aria-orientation="vertical">
         {TAB_META.map((tab) => (
           <button
@@ -226,6 +253,7 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
           </button>
         ))}
       </nav>
+      </aside>
 
       {/* status bar – the transient "Saving…" note overlays the tab body so it
           never shifts the layout; an error stays in flow so it hides nothing */}
@@ -240,7 +268,20 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
       </div>
 
       {/* tab panels */}
-      <div className={`settings-body${activeTab === "providers" ? " settings-body--providers" : ""}`}>
+      <div ref={bodyRef} className={`settings-body${activeTab === "providers" && !query.trim() ? " settings-body--providers" : ""}`}>
+        {query.trim() ? (
+          <section className="settings-search-results" aria-label={t("SettingsSearchResults")}>
+            <h1 className="settings-page-heading">{t("SettingsSearchResults")}</h1>
+            <p role="status">{searchResults.length ? `${t("SettingsSearchResults")}: ${searchResults.length}` : t("SettingsSearchEmpty")}</p>
+            {searchResults.map(target => (
+              <button type="button" key={`${target.tab}-${target.menuSection ?? ""}`}
+                onClick={() => openSearchResult(target)}>
+                <span>{t(target.label)}</span>
+                <small>{t(TAB_META.find(tab => tab.id === target.tab)?.labelKey ?? "TabGeneral")} →</small>
+              </button>
+            ))}
+          </section>
+        ) : <>
         {activeTab !== "providers" && (
           <h1 className="settings-page-heading">{t(TAB_META.find(tab => tab.id === activeTab)?.labelKey ?? "SettingsWindowTitle")}</h1>
         )}
@@ -268,7 +309,8 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
           />
         )}
         {activeTab === "menu" && (
-          <DisplayTab mode="menu" settings={settings} set={set} saving={saving} />
+          <DisplayTab mode="menu" settings={settings} set={set} saving={saving}
+            menuSection={menuSection} onMenuSectionChange={setMenuSection} />
         )}
         {activeTab === "usageSpend" && (
           <UsageSpendTab settings={settings} set={set} saving={saving} />
@@ -279,6 +321,7 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
         {activeTab === "about" && (
           <AboutTab settings={settings} set={set} saving={saving} />
         )}
+        </>}
       </div>
     </div>
   );

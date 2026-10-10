@@ -80,6 +80,7 @@ pnpm run tauri:build
 - Logging: `tracing` only. Never log secrets, cookies, tokens, or raw API keys.
 - Frontend tests are co-located `*.test.ts` / `*.test.tsx`. Bridge types in `types/bridge.ts` must stay aligned with Rust command payloads (including settings tab ids).
 - **Settings tab ids** (case-sensitive; backend whitelist in `surface_target.rs` must mirror frontend `SettingsTabId` / `TAB_META`): `general`, `providers`, `notifications`, `menuBar`, `menu`, `usageSpend`, `advanced`, `about`. Unknown ids fall back to General in the UI. Old ids `display` / `apiKeys` / `cookies` are not valid settings tabs.
+- **Settings search**: `apps/desktop-tauri/src/surfaces/settings/settingsSearch.ts` indexes locale keys and provider display names only. Keep its target section and keywords aligned when moving or adding settings; never index account values or credentials.
 - Cookie import UX uses **explicit browser selection** in Preferences — do not assume Chrome-only.
 - Claude CLI output is user-configurable; do not treat a customizable status line as the usage source of truth.
 - Keep provider data siloed: never show identity / plan / email from provider A in provider B UI.
