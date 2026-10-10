@@ -1416,3 +1416,14 @@ DurationDays = { "{}" } 日
 DurationHours = { "{}" } 時間
 DurationMinutes = { "{}" } 分
 DurationMonths = { "{}" } か月
+
+SettingsSearchPlaceholder = 設定を検索
+SettingsSearchClear = 設定の検索をクリア
+SettingsSearchEmpty = 設定が見つかりません。別の単語を試してください。
+SettingsSearchResults = 検索結果
+SettingsMenuTray = トレイの外観
+SettingsMenuShortcuts = ショートカット
+FloatBarSizePreset = サイズのプリセット
+FloatBarSizePresetHelper = サイズを選ぶか、下のスライダーで調整してください。
+FloatBarComfortable = ゆったり
+FloatBarCustomSize = カスタム

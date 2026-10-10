@@ -1418,3 +1418,14 @@ DurationDays = { "{}" } д
 DurationHours = { "{}" } год
 DurationMinutes = { "{}" } хв
 DurationMonths = { "{}" } міс.
+
+SettingsSearchPlaceholder = Пошук налаштувань
+SettingsSearchClear = Очистити пошук налаштувань
+SettingsSearchEmpty = Налаштування не знайдено. Спробуйте інше слово.
+SettingsSearchResults = Результати пошуку
+SettingsMenuTray = Вигляд трея
+SettingsMenuShortcuts = Гарячі клавіші
+FloatBarSizePreset = Готовий розмір
+FloatBarSizePresetHelper = Виберіть розмір або налаштуйте його повзунком нижче.
+FloatBarComfortable = Комфортний
+FloatBarCustomSize = Власний розмір

@@ -1415,3 +1415,14 @@ DurationDays = { "{}" } d
 DurationHours = { "{}" } h
 DurationMinutes = { "{}" } min
 DurationMonths = { "{}" } mes.
+
+SettingsSearchPlaceholder = Buscar ajustes
+SettingsSearchClear = Borrar búsqueda de ajustes
+SettingsSearchEmpty = No se encontraron ajustes. Prueba otra palabra.
+SettingsSearchResults = Resultados de búsqueda
+SettingsMenuTray = Apariencia de la bandeja
+SettingsMenuShortcuts = Atajos
+FloatBarSizePreset = Tamaño predefinido
+FloatBarSizePresetHelper = Elige un tamaño o ajústalo con el control deslizante de abajo.
+FloatBarComfortable = Cómodo
+FloatBarCustomSize = Personalizado

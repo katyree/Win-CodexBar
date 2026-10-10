@@ -1416,3 +1416,14 @@ DurationDays = { "{}" } g
 DurationHours = { "{}" } sa
 DurationMinutes = { "{}" } dk
 DurationMonths = { "{}" } ay
+
+SettingsSearchPlaceholder = Ayarlarda ara
+SettingsSearchClear = Ayar aramasını temizle
+SettingsSearchEmpty = Ayar bulunamadı. Başka bir sözcük deneyin.
+SettingsSearchResults = Arama sonuçları
+SettingsMenuTray = Tepsi görünümü
+SettingsMenuShortcuts = Kısayollar
+FloatBarSizePreset = Boyut ön ayarı
+FloatBarSizePresetHelper = Bir boyut seçin veya aşağıdaki kaydırıcıyla ayarlayın.
+FloatBarComfortable = Rahat
+FloatBarCustomSize = Özel

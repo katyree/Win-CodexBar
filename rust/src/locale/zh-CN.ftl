@@ -1416,3 +1416,14 @@ DurationDays = { "{}" } 天
 DurationHours = { "{}" } 小时
 DurationMinutes = { "{}" } 分钟
 DurationMonths = { "{}" } 个月
+
+SettingsSearchPlaceholder = 搜索设置
+SettingsSearchClear = 清除设置搜索
+SettingsSearchEmpty = 未找到设置。请尝试其他关键词。
+SettingsSearchResults = 搜索结果
+SettingsMenuTray = 托盘外观
+SettingsMenuShortcuts = 快捷键
+FloatBarSizePreset = 预设大小
+FloatBarSizePresetHelper = 选择大小，或使用下方滑块微调。
+FloatBarComfortable = 舒适
+FloatBarCustomSize = 自定义

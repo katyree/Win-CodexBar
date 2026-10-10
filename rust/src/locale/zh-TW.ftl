@@ -1416,3 +1416,14 @@ DurationDays = { "{}" } 天
 DurationHours = { "{}" } 小時
 DurationMinutes = { "{}" } 分鐘
 DurationMonths = { "{}" } 個月
+
+SettingsSearchPlaceholder = 搜尋設定
+SettingsSearchClear = 清除設定搜尋
+SettingsSearchEmpty = 找不到設定。請嘗試其他關鍵字。
+SettingsSearchResults = 搜尋結果
+SettingsMenuTray = 系統匣外觀
+SettingsMenuShortcuts = 快速鍵
+FloatBarSizePreset = 預設大小
+FloatBarSizePresetHelper = 選擇大小，或使用下方滑桿微調。
+FloatBarComfortable = 舒適
+FloatBarCustomSize = 自訂
