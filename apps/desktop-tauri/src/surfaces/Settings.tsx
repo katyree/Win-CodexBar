@@ -101,8 +101,8 @@ const TabIcons: Record<SettingsTabId, ReactElement> = {
 };
 
 
-const SETTINGS_WINDOW_HEIGHT = 580;
-const SETTINGS_WINDOW_WIDTH = 600;
+const SETTINGS_WINDOW_HEIGHT = 680;
+const SETTINGS_WINDOW_WIDTH = 820;
 
 async function applySettingsWindowSize() {
   const workArea = await getWorkAreaRect().catch(() => null);
@@ -211,7 +211,7 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
       </div>
 
       {/* tab bar */}
-      <nav className="settings-tabs" role="tablist">
+      <nav className="settings-tabs" role="tablist" aria-orientation="vertical">
         {TAB_META.map((tab) => (
           <button
             type="button"
@@ -241,6 +241,9 @@ export default function Settings({ state, initialTab: propTab }: { state: Bootst
 
       {/* tab panels */}
       <div className={`settings-body${activeTab === "providers" ? " settings-body--providers" : ""}`}>
+        {activeTab !== "providers" && (
+          <h1 className="settings-page-heading">{t(TAB_META.find(tab => tab.id === activeTab)?.labelKey ?? "SettingsWindowTitle")}</h1>
+        )}
         {activeTab === "general" && (
           <GeneralTab mode="general" settings={settings} set={set} saving={saving} />
         )}

@@ -1,0 +1,129 @@
+.settings {
+  --edge-panel: #0c111b;
+  --edge-card: #131b29;
+  --edge-sidebar: #101724;
+  --edge-border: #2a3548;
+  --text-primary: #e8edf7;
+  --text-secondary: #a7b2c7;
+  --text-muted: #a7b2c7;
+  display: grid;
+  grid-template-columns: 164px minmax(0, 1fr);
+  grid-template-rows: 36px auto minmax(0, 1fr);
+  background: var(--edge-panel);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .settings {
+  --edge-panel: #f3f6fb;
+  --edge-card: #ffffff;
+  --edge-sidebar: #eaf0f8;
+  --edge-border: #ccd5e2;
+  --text-primary: #182333;
+  --text-secondary: #536178;
+  --text-muted: #536178;
+}
+
+.settings .settings-titlebar {
+  grid-column: 1 / -1;
+  height: 36px;
+  background: var(--edge-panel);
+  border-bottom: 1px solid var(--edge-border);
+}
+
+.settings .settings-titlebar__title,
+.settings .settings-titlebar__control { color: var(--text-primary); }
+.settings .settings-titlebar__control { height: 36px; }
+
+.settings .settings-tabs {
+  grid-column: 1;
+  grid-row: 2 / 4;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 22px 10px;
+  gap: 5px;
+  background: var(--edge-sidebar);
+  border: 0;
+  border-right: 1px solid var(--edge-border);
+  overflow: auto;
+}
+
+.settings .settings-tabs::before {
+  content: "CodexBar";
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 650;
+  padding: 0 10px 20px;
+}
+
+.settings .settings-tab {
+  flex: 0 0 auto;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 40px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  border-left: 2px solid transparent;
+  border-radius: 7px;
+}
+
+.settings .settings-tab__icon { flex-shrink: 0; }
+.settings .settings-tab__label { text-align: left; overflow-wrap: anywhere; }
+.settings .settings-tab--active {
+  background: color-mix(in srgb, #79b6ff 17%, var(--edge-panel));
+  color: var(--text-primary);
+  border-left-color: #79b6ff;
+}
+.settings .settings-tab--active .settings-tab__icon { color: #79b6ff; }
+
+.settings .settings-body {
+  grid-column: 2;
+  grid-row: 3;
+  max-width: none;
+  min-height: 0;
+  min-width: 0;
+  padding: 24px;
+  overflow: auto;
+}
+.settings .settings-body--providers { padding: 0; overflow: hidden; }
+.settings-page-heading { font-size: 25px; letter-spacing: -0.5px; margin: 0 0 22px; }
+
+.settings .settings-status-slot { grid-column: 2; grid-row: 2; align-self: start; z-index: 2; }
+.settings .settings-status--error { background: var(--edge-card); border: 1px solid var(--error-fg); }
+
+.settings .settings-section {
+  --section-accent: #79b6ff;
+  border: 1px solid var(--edge-border);
+  border-left: 3px solid var(--section-accent);
+  border-radius: 4px 10px 10px 4px;
+  background: linear-gradient(110deg, color-mix(in srgb, var(--section-accent) 8%, var(--edge-card)), var(--edge-card) 80%);
+  padding: 17px;
+  margin: 0 0 16px;
+  gap: 10px;
+}
+.settings .settings-section:nth-of-type(even) { --section-accent: #c3a3ff; }
+.settings .settings-section__group { background: transparent; border: 0; padding: 0; }
+.settings .settings-section__title { font-size: 14px; color: var(--text-primary); }
+.settings .settings-field { padding: 12px 0; gap: 16px; }
+.settings .settings-field__label { font-size: 12px; }
+.settings .settings-field__desc { font-size: 11px; color: var(--text-secondary); }
+.settings .provider-detail-section { border-bottom-color: var(--edge-border); }
+
+@media (max-width: 640px) {
+  .settings { grid-template-columns: 128px minmax(0, 1fr); }
+  .settings .settings-tabs { padding: 16px 7px; }
+  .settings .settings-tab { font-size: 11px; gap: 7px; padding: 9px 6px; }
+  .settings .settings-body:not(.settings-body--providers) { padding: 16px; }
+  .settings .settings-section { padding: 12px; }
+  .settings .settings-field { flex-wrap: wrap; }
+  .settings .settings-field > * { max-width: 100%; }
+}
+
+@media (forced-colors: active) {
+  .settings .settings-section { border: 1px solid CanvasText; }
+  .settings .settings-tab--active { border-left-color: Highlight; }
+}

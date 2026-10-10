@@ -257,6 +257,7 @@ function ProviderPill({
   return (
     <div
       className={`floatbar__pill floatbar__pill--${tone}`}
+      data-provider={provider.providerId}
       title={
         state.isProblem
           ? `${provider.displayName}: ${stateLabel}`
@@ -271,6 +272,7 @@ function ProviderPill({
         <ProviderIcon providerId={provider.providerId} size={iconSize} />
       </span>
       <span className="floatbar__text" data-tauri-drag-region>
+        <span className="floatbar__name" data-tauri-drag-region>{provider.displayName}</span>
         <span className="floatbar__pct" aria-label={state.isProblem ? stateLabel : undefined} data-tauri-drag-region>
           {state.isProblem ? (
             <>
@@ -279,6 +281,9 @@ function ProviderPill({
             </>
           ) : label}
         </span>
+        {!state.isProblem && !informational && (
+          <span className="floatbar__suffix" data-tauri-drag-region>{displaySuffix}</span>
+        )}
         {showResetInline && resetText && inlineReset && (
           <span
             className="floatbar__reset"
