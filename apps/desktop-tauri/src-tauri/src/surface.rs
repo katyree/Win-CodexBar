@@ -53,11 +53,11 @@ impl SurfaceMode {
             Self::TrayPanel => WindowProperties {
                 visible: true,
                 decorations: false,
-                resizable: true,
+                resizable: false,
                 width: 328.0,
                 height: 776.0,
-                min_width: Some(300.0),
-                min_height: Some(360.0),
+                min_width: None,
+                min_height: None,
                 always_on_top: false,
                 blur_dismiss: true,
                 skip_taskbar: true,
@@ -276,13 +276,13 @@ mod tests {
     fn tray_panel_is_resizable_blur_dismiss_flyout() {
         let props = SurfaceMode::TrayPanel.window_properties();
         // "Pop Out Dashboard" flyout: resizable, anchored, auto-hide, no taskbar.
-        assert!(props.resizable);
+        assert!(!props.resizable);
         assert!(props.blur_dismiss);
         assert!(!props.always_on_top);
         assert!(props.skip_taskbar);
         assert!(!props.decorations);
-        assert_eq!(props.min_width, Some(300.0));
-        assert_eq!(props.min_height, Some(360.0));
+        assert_eq!(props.min_width, None);
+        assert_eq!(props.min_height, None);
     }
 
     #[test]

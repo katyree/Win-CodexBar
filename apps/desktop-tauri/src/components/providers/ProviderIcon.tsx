@@ -1,3 +1,4 @@
+import { providerColor } from "../../lib/providerPalette";
 import { getProviderIcon } from "./providerIcons";
 
 interface Props {
@@ -27,7 +28,7 @@ export function ProviderIcon({
         className={`provider-icon provider-icon--svg${className ? " " + className : ""}`}
         style={{
           ...dims,
-          ["--provider-brand" as string]: entry.brandColor,
+          ["--provider-brand" as string]: providerColor(providerId),
         }}
         title={title}
         aria-hidden={title ? undefined : true}
@@ -42,7 +43,7 @@ export function ProviderIcon({
       className={`provider-icon provider-icon--letter${className ? " " + className : ""}`}
       style={{
         ...dims,
-        ["--provider-brand" as string]: entry.brandColor,
+        ["--provider-brand" as string]: providerColor(providerId),
       }}
       title={title}
       aria-hidden={title ? undefined : true}

@@ -148,9 +148,7 @@ fn open_with_anchor(
     // from, rather than duplicating these values as independent constants
     // that could silently drift from `surface.rs`.
     let props = SurfaceMode::TrayPanel.window_properties();
-    let (width, height) = stored_size()
-        .map(|(w, h)| (w as f64, h as f64))
-        .unwrap_or((props.width, props.height));
+    let (width, height) = (props.width, props.height);
 
     let url = WebviewUrl::App("index.html?window=flyout".into());
 
@@ -553,9 +551,9 @@ mod tests {
         let props = SurfaceMode::TrayPanel.window_properties();
         assert_eq!(props.width, 328.0);
         assert_eq!(props.height, 776.0);
-        assert_eq!(props.min_width, Some(300.0));
-        assert_eq!(props.min_height, Some(360.0));
-        assert!(props.resizable);
+        assert_eq!(props.min_width, None);
+        assert_eq!(props.min_height, None);
+        assert!(!props.resizable);
         assert!(!props.always_on_top);
         assert!(props.skip_taskbar);
         assert!(!props.decorations);

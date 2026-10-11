@@ -52,6 +52,7 @@ const windowMocks = vi.hoisted(() => ({
     setSize: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     scaleFactor: vi.fn().mockResolvedValue(1),
+    onMoved: vi.fn().mockResolvedValue(() => {}), onScaleChanged: vi.fn().mockResolvedValue(() => {}),
     onResized: vi.fn().mockResolvedValue(() => {}),
     innerSize: vi.fn().mockResolvedValue({ width: 328, height: 200 }),
   })),
@@ -512,12 +513,13 @@ describe("TrayPanel provider grid", () => {
       ).not.toBeNull();
     });
     expect(container.querySelector(".provider-grid__item")?.textContent).toContain("すべて");
-    expect(screen.getByText("ズーム")).toBeInTheDocument();
-    expect(screen.getByLabelText("ズーム")).toBeInTheDocument();
+    expect(screen.queryByText("ズーム")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("ズーム")).not.toBeInTheDocument();
     expect(screen.getByText("更新")).toBeInTheDocument();
     expect(screen.getByText("設定...")).toBeInTheDocument();
     expect(screen.getByText("CodexBar について")).toBeInTheDocument();
     expect(screen.getByText("終了")).toBeInTheDocument();
+    fireEvent.click(container.querySelector(".provider-tile")!);
     expect(await screen.findByText("30日間のコスト")).toBeInTheDocument();
     expect(container.querySelector(".menu-card__subtitle")?.textContent).toContain("日前");
     expect(screen.getByText("最新トークン")).toBeInTheDocument();
@@ -591,21 +593,23 @@ describe("TrayPanel provider grid", () => {
     },
   );
 
-  it("only requests chart data for providers that can render charts", async () => {
-    renderTrayPanel([
-      provider("codex", "Codex"),
-      provider("claude", "Claude"),
-      provider("copilot", "GitHub Copilot"),
-      provider("cursor", "Cursor"),
-      provider("deepseek", "DeepSeek"),
-    ]);
+  it("preserves project privacy and omits Wayfinder's placeholder quota in tiles", async () => {
+    const { container } = renderTrayPanel([
+      { ...provider("openaiapi", "OpenAI API"), planName: "Project: proj-test-private" },
+      provider("wayfinder", "Wayfinder", 0),
+    ], { hidePersonalInfo: true, enabledProviders: ["openaiapi", "wayfinder"] });
+    await waitFor(() => expect(container.querySelectorAll(".provider-tile")).toHaveLength(2));
+    expect(container.textContent).not.toContain("proj-test-private");
+    expect(container.querySelector('[data-provider="wayfinder"] .menu-metric')).toBeNull();
+  });
 
-    await waitFor(() => {
-      expect(tauriMocks.getProviderChartData).toHaveBeenCalledTimes(2);
-    });
-
-    expect(tauriMocks.getProviderChartData).toHaveBeenCalledWith("codex", undefined);
-    expect(tauriMocks.getProviderChartData).toHaveBeenCalledWith("claude", undefined);
+  it("loads detailed charts only after opening a provider tile", async () => {
+    const { container } = renderTrayPanel([provider("codex", "Codex")]);
+    await waitFor(() => expect(container.querySelector(".provider-tile")).not.toBeNull());
+    expect(tauriMocks.getProviderChartData).not.toHaveBeenCalled();
+    fireEvent.click(container.querySelector(".provider-tile")!);
+    await waitFor(() => expect(tauriMocks.getProviderChartData).toHaveBeenCalledWith("codex", undefined));
+    expect(container.querySelector(".menu-card")).not.toBeNull();
   });
 
   it("renders providers in settings catalog order instead of fetch completion order", async () => {
@@ -645,7 +649,7 @@ describe("TrayPanel provider grid", () => {
       "Gemini",
     ]);
     expect(
-      Array.from(container.querySelectorAll(".menu-card__name")).map(
+      Array.from(container.querySelectorAll(".provider-tile__header strong")).map(
         (node) => node.textContent,
       ),
     ).toEqual(["Codex", "Claude", "Cursor", "Factory", "Gemini"]);
@@ -658,63 +662,13 @@ describe("TrayPanel provider grid", () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelector(".menu-stack__item")).not.toBeNull();
+      expect(container.querySelector(".provider-tile")).not.toBeNull();
     });
 
     expect(container.querySelectorAll(".menu-metric")).toHaveLength(3);
   });
 
-  it("uses independent columns for a wide user-sized overview", async () => {
-    tauriMocks.flyoutStoredSize.mockResolvedValue([700, 700]);
-    const providers = [
-      provider("codex", "Codex"),
-      provider("claude", "Claude"),
-      provider("antigravity", "Antigravity"),
-      provider("copilot", "GitHub Copilot"),
-    ];
 
-    const { container } = renderTrayPanel(providers, {
-      enabledProviders: providers.map((snapshot) => snapshot.providerId),
-    });
-
-    await waitFor(() => {
-      expect(container.querySelector(".tray-panel-reveal--usersized")).not.toBeNull();
-    });
-
-    expect(
-      Array.from(container.querySelectorAll(".menu-stack__column")).map((column) =>
-        Array.from(column.querySelectorAll(".menu-stack__item")).map(
-          (item) => item.id,
-        ),
-      ),
-    ).toEqual([
-      ["card-codex", "card-antigravity"],
-      ["card-claude", "card-copilot"],
-    ]);
-    expect(container.querySelector(".menu-stack__sep")).toBeNull();
-  });
-
-  it("keeps the stacked layout when the saved flyout width is narrow", async () => {
-    vi.spyOn(window, "innerWidth", "get").mockReturnValue(700);
-    tauriMocks.flyoutStoredSize.mockResolvedValue([500, 700]);
-    const providers = [
-      provider("codex", "Codex"),
-      provider("claude", "Claude"),
-      provider("antigravity", "Antigravity"),
-      provider("copilot", "GitHub Copilot"),
-    ];
-
-    const { container } = renderTrayPanel(providers, {
-      enabledProviders: providers.map((snapshot) => snapshot.providerId),
-    });
-
-    await waitFor(() => {
-      expect(container.querySelector(".tray-panel-reveal--usersized")).not.toBeNull();
-    });
-
-    expect(container.querySelector(".menu-stack__column")).toBeNull();
-    expect(container.querySelectorAll(".menu-stack__sep")).toHaveLength(3);
-  });
 
   it("collapses and expands the full provider catalog in the dense tray grid", async () => {
     const providers = TEST_PROVIDER_CATALOG.map(([id, displayName], index) =>
@@ -736,7 +690,7 @@ describe("TrayPanel provider grid", () => {
     expect(grid?.getAttribute("data-provider-count")).toBe(
       String(providers.length + 1),
     );
-    expect(container.querySelectorAll(".menu-stack__item")).toHaveLength(4);
+    expect(container.querySelectorAll(".provider-tile")).toHaveLength(providers.length);
 
     const expand = container.querySelector<HTMLButtonElement>(
       '.provider-grid__item--more[aria-label="Show all providers"]',
@@ -752,7 +706,7 @@ describe("TrayPanel provider grid", () => {
       );
     });
     expect(grid?.getAttribute("data-expanded")).toBe("true");
-    expect(container.querySelectorAll(".menu-stack__item")).toHaveLength(
+    expect(container.querySelectorAll(".provider-tile")).toHaveLength(
       providers.length,
     );
     for (const [id, displayName] of TEST_PROVIDER_CATALOG) {
@@ -797,7 +751,7 @@ describe("TrayPanel provider grid", () => {
     );
   });
 
-  it("provider grid indicator follows the show-as-used setting", async () => {
+  it("provider tiles and grid consistently show percent used", async () => {
     const { container, rerender } = renderTrayPanel(
       [provider("claude", "Claude", 35)],
       { showAsUsed: true },
@@ -824,7 +778,7 @@ describe("TrayPanel provider grid", () => {
       const track = container.querySelector<HTMLElement>(
         ".provider-grid__weekly-track",
       );
-      expect(track?.style.getPropertyValue("--weekly-pct")).toBe("65%");
+      expect(track?.style.getPropertyValue("--weekly-pct")).toBe("35%");
     });
   });
 
@@ -846,18 +800,14 @@ describe("TrayPanel provider grid", () => {
   });
 
   it("renders the default tray panel layout with no legacy window chrome", async () => {
-    // Pins the one dashboard layout: tray-variant surface, icon-first
-    // provider switcher, and the Zoom / Refresh / Settings... / About / Quit
-    // footer. The retired PopOut layout had a "CodexBar" title bar with
-    // window controls and a Settings / About / Quit footer without Zoom or
-    // Refresh.
+    // Automatic sizing leaves only app actions in the footer.
     const { container } = renderTrayPanel([
       provider("claude", "Claude", 35),
       provider("codex", "Codex", 20),
     ]);
 
     await waitFor(() => {
-      expect(container.querySelector(".menu-surface__footer-zoom")).not.toBeNull();
+      expect(container.querySelector(".menu-surface__footer-zoom")).toBeNull();
       expect(container.querySelector(".provider-grid")).not.toBeNull();
     });
 
@@ -871,8 +821,7 @@ describe("TrayPanel provider grid", () => {
     const footerLabels = Array.from(
       container.querySelectorAll(".menu-surface__footer > *"),
     ).map((el) => el.textContent ?? "");
-    expect(footerLabels[0]).toContain("Zoom");
-    expect(footerLabels.slice(1).map((label) => label.replace(/Ctrl\+.*/, ""))).toEqual([
+    expect(footerLabels.map((label) => label.replace(/Ctrl\+.*/, ""))).toEqual([
       "↻Refresh",
       "⚙Settings...",
       "ⓘAbout CodexBar",
@@ -881,49 +830,19 @@ describe("TrayPanel provider grid", () => {
     expect(tauriMocks.setSurfaceMode).not.toHaveBeenCalled();
   });
 
-  it("offers a move strip and resize grips on every edge and corner", async () => {
+  it("keeps the move strip but removes manual resize grips", async () => {
     const { container, unmount } = renderTrayPanel([provider("cursor", "Cursor", 20)]);
 
     await waitFor(() => {
       expect(container.querySelector(".tray-move-handle")).not.toBeNull();
     });
 
-    const edges = Array.from(container.querySelectorAll(".tray-resize")).map((grip) =>
-      Array.from(grip.classList).find((name) => name.startsWith("tray-resize--")),
-    );
-    expect(edges.sort()).toEqual([
-      "tray-resize--bottom",
-      "tray-resize--bottomleft",
-      "tray-resize--bottomright",
-      "tray-resize--left",
-      "tray-resize--right",
-      "tray-resize--top",
-      "tray-resize--topleft",
-      "tray-resize--topright",
-    ]);
+    expect(container.querySelector(".tray-resize")).toBeNull();
     // Unmount while the mocks still resolve; the shared afterEach resets
     // them before the automatic cleanup runs.
     unmount();
   });
 
-  it("starts a native resize toward the grabbed corner without arming the blur guard", async () => {
-    const { container, unmount } = renderTrayPanel([provider("cursor", "Cursor", 20)]);
-    await waitFor(() => {
-      expect(container.querySelector(".tray-resize--bottomright")).not.toBeNull();
-    });
-
-    fireEvent.mouseDown(container.querySelector(".tray-resize--bottomright")!);
-
-    await waitFor(() => {
-      expect(windowMocks.startResizeDragging).toHaveBeenCalledWith("SouthEast");
-    });
-    // The backend keeps the panel open while the button is held on it; a
-    // guard would also swallow the next real outside click.
-    expect(tauriMocks.beginFlyoutGesture).not.toHaveBeenCalled();
-    // Unmount while the mocks still resolve; the shared afterEach resets
-    // them before the automatic cleanup runs.
-    unmount();
-  });
 
   it("moves the flyout from the strip and puts it back by the tray on double-click", async () => {
     const { container, unmount } = renderTrayPanel([provider("cursor", "Cursor", 20)]);
@@ -948,74 +867,6 @@ describe("TrayPanel provider grid", () => {
     unmount();
   });
 
-  function captureWindowEvents(scale: number) {
-    const handlers: {
-      resized?: (event: { payload: { width: number; height: number } }) => void;
-      scaleChanged?: (event: {
-        payload: { scaleFactor: number; size: { width: number; height: number } };
-      }) => void;
-    } = {};
-    windowMocks.getCurrentWindow.mockReturnValue({
-      startDragging: windowMocks.startDragging,
-      startResizeDragging: windowMocks.startResizeDragging,
-      setSize: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-      scaleFactor: vi.fn().mockResolvedValue(scale),
-      innerSize: vi.fn().mockResolvedValue({ width: 656, height: 400 }),
-      onResized: vi.fn((handler) => {
-        handlers.resized = handler;
-        return Promise.resolve(() => {});
-      }),
-      onScaleChanged: vi.fn((handler) => {
-        handlers.scaleChanged = handler;
-        return Promise.resolve(() => {});
-      }),
-    });
-    return handlers;
-  }
-
-  it("remembers a user resize in logical px and re-anchors at the new size", async () => {
-    const handlers = captureWindowEvents(2);
-    const { unmount } = renderTrayPanel([provider("cursor", "Cursor", 20)]);
-    await waitFor(() => expect(handlers.resized).toBeDefined());
-    // Let the first auto-fit pass and its trailing guard settle.
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    tauriMocks.reanchorTrayPanel.mockClear();
-
-    act(() => {
-      handlers.resized!({ payload: { width: 900, height: 1500 } });
-    });
-
-    await waitFor(() => {
-      expect(tauriMocks.setFlyoutSize).toHaveBeenCalledWith(450, 750);
-    });
-    expect(tauriMocks.reanchorTrayPanel).toHaveBeenCalled();
-    // Unmount while the mocks still resolve; the shared afterEach resets
-    // them before the automatic cleanup runs.
-    unmount();
-  });
-
-  it("does not treat a DPI rescale as a user resize", async () => {
-    const handlers = captureWindowEvents(2);
-    const { unmount } = renderTrayPanel([provider("cursor", "Cursor", 20)]);
-    await waitFor(() => expect(handlers.scaleChanged).toBeDefined());
-    // Let the first auto-fit pass and its trailing guard settle.
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    act(() => {
-      handlers.scaleChanged!({
-        payload: { scaleFactor: 2.25, size: { width: 738, height: 1755 } },
-      });
-      handlers.resized!({ payload: { width: 738, height: 1755 } });
-    });
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
-    expect(tauriMocks.setFlyoutSize).not.toHaveBeenCalled();
-    // Unmount while the mocks still resolve; the shared afterEach resets
-    // them before the automatic cleanup runs.
-    unmount();
-  });
-
   it("ignores non-primary presses on the move strip", async () => {
     const { container, unmount } = renderTrayPanel([provider("cursor", "Cursor", 20)]);
     await waitFor(() => {
@@ -1031,58 +882,6 @@ describe("TrayPanel provider grid", () => {
     unmount();
   });
 
-  it("renders the tray footer zoom slider above Refresh and persists trayScalePercent after the debounce", async () => {
-    const { container } = renderTrayPanel(
-      [provider("claude", "Claude", 35)],
-      { trayScalePercent: 120 },
-    );
-
-    await waitFor(() => {
-      expect(container.querySelector(".menu-surface__footer-zoom")).not.toBeNull();
-    });
-
-    const footerChildren = Array.from(
-      container.querySelectorAll(".menu-surface__footer > *"),
-    );
-    const zoomIndex = footerChildren.findIndex((el) =>
-      el.classList.contains("menu-surface__footer-zoom"),
-    );
-    const refreshIndex = footerChildren.findIndex(
-      (el) => el.textContent?.includes("Refresh"),
-    );
-    expect(zoomIndex).toBeGreaterThanOrEqual(0);
-    expect(refreshIndex).toBeGreaterThan(zoomIndex);
-
-    // Slider reflects the persisted settings value.
-    const slider = container.querySelector<HTMLInputElement>(
-      ".menu-surface__footer-zoom-slider",
-    )!;
-    expect(slider).not.toBeNull();
-    expect(slider.value).toBe("120");
-    expect(slider.min).toBe("100");
-    expect(slider.max).toBe("200");
-    expect(slider.step).toBe("5");
-    expect(
-      container.querySelector(".menu-surface__footer-zoom-value")?.textContent,
-    ).toBe("120%");
-
-    fireEvent.change(slider, { target: { value: "150" } });
-
-    // Live preview: thumb and readout update immediately from local state…
-    expect(slider.value).toBe("150");
-    expect(
-      container.querySelector(".menu-surface__footer-zoom-value")?.textContent,
-    ).toBe("150%");
-
-    // …while persistence trails the ~250ms debounce (not synchronous).
-    expect(tauriMocks.updateSettings).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(tauriMocks.updateSettings).toHaveBeenCalledWith({
-        trayScalePercent: 150,
-      });
-    });
-    expect(tauriMocks.updateSettings).toHaveBeenCalledTimes(1);
-  });
 
   it("reveals the tray panel if the native resize pass fails", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -1090,7 +889,8 @@ describe("TrayPanel provider grid", () => {
       setSize: vi.fn().mockRejectedValue(new Error("resize failed")),
       close: vi.fn().mockResolvedValue(undefined),
       scaleFactor: vi.fn().mockResolvedValue(1),
-      onResized: vi.fn().mockResolvedValue(() => {}),
+      onMoved: vi.fn().mockResolvedValue(() => {}), onScaleChanged: vi.fn().mockResolvedValue(() => {}),
+    onResized: vi.fn().mockResolvedValue(() => {}),
       innerSize: vi.fn().mockResolvedValue({ width: 328, height: 200 }),
     });
 
@@ -1109,7 +909,8 @@ describe("TrayPanel provider grid", () => {
       setSize,
       close: vi.fn().mockResolvedValue(undefined),
       scaleFactor: vi.fn().mockResolvedValue(1),
-      onResized: vi.fn().mockResolvedValue(() => {}),
+      onMoved: vi.fn().mockResolvedValue(() => {}), onScaleChanged: vi.fn().mockResolvedValue(() => {}),
+    onResized: vi.fn().mockResolvedValue(() => {}),
       innerSize: vi.fn().mockResolvedValue({ width: 328, height: 200 }),
     });
 
@@ -1132,105 +933,7 @@ describe("TrayPanel provider grid", () => {
     expect(tauriMocks.reanchorTrayPanel).not.toHaveBeenCalled();
   });
 
-  it("reserves dense all-provider height on first layout", async () => {
-    const setSize = vi.fn().mockResolvedValue(undefined);
-    windowMocks.getCurrentWindow.mockReturnValue({
-      setSize,
-      close: vi.fn().mockResolvedValue(undefined),
-      scaleFactor: vi.fn().mockResolvedValue(1),
-      onResized: vi.fn().mockResolvedValue(() => {}),
-      innerSize: vi.fn().mockResolvedValue({ width: 328, height: 200 }),
-    });
-    const denseProviders = TEST_PROVIDER_CATALOG.slice(0, 36).map(([id, displayName]) =>
-      provider(id, displayName),
-    );
 
-    renderTrayPanel(denseProviders, {
-      enabledProviders: denseProviders.map((snapshot) => snapshot.providerId),
-    });
 
-    await waitFor(() => {
-      expect(setSize).toHaveBeenCalledWith(
-        expect.objectContaining({ width: 328, height: 776 }),
-      );
-    });
-  });
 
-  it("keeps provider detail mode tall enough for context actions and footer", async () => {
-    const setSize = vi.fn().mockResolvedValue(undefined);
-    windowMocks.getCurrentWindow.mockReturnValue({
-      setSize,
-      close: vi.fn().mockResolvedValue(undefined),
-      scaleFactor: vi.fn().mockResolvedValue(1),
-      onResized: vi.fn().mockResolvedValue(() => {}),
-      innerSize: vi.fn().mockResolvedValue({ width: 328, height: 200 }),
-    });
-    const errorProvider = {
-      ...provider("abacus", "Abacus AI", 0),
-      error: "Source mode `Cli` not supported for this provider",
-    };
-
-    const { container } = renderTrayPanel([errorProvider]);
-
-    await waitFor(() => {
-      expect(container.querySelector(".tray-panel-reveal--ready")).not.toBeNull();
-    });
-    setSize.mockClear();
-
-    fireEvent.click(
-      container.querySelector<HTMLButtonElement>(
-        '.provider-grid__item[aria-label="Abacus AI"]',
-      )!,
-    );
-
-    await waitFor(() => {
-      expect(setSize).toHaveBeenCalledWith(
-        expect.objectContaining({ width: 328, height: 420 }),
-      );
-    });
-  });
-
-  it("scales the auto-fit measure by the active tray zoom before clamping (#265)", async () => {
-    const setSize = vi.fn().mockResolvedValue(undefined);
-    windowMocks.getCurrentWindow.mockReturnValue({
-      setSize,
-      close: vi.fn().mockResolvedValue(undefined),
-      scaleFactor: vi.fn().mockResolvedValue(1),
-      onResized: vi.fn().mockResolvedValue(() => {}),
-      innerSize: vi.fn().mockResolvedValue({ width: 328, height: 200 }),
-    });
-    // jsdom has no layout engine (scrollHeight always reads 0), so pin it
-    // globally to a deterministic PRE-zoom content height: TrayPanel applies
-    // `zoom: trayScale` via CSS and the hook must size the window in POST-zoom
-    // px or tall cards clip below the fold (#265).
-    const scrollHeight = vi
-      .spyOn(Element.prototype, "scrollHeight", "get")
-      .mockReturnValue(505);
-
-    const first = renderTrayPanel([provider("codex", "Codex", 61)], {
-      trayScalePercent: 150,
-    });
-
-    // 505 raw × 1.5 zoom = 757.5 → 758 rounded, + the 4px fudge = 762.
-    await waitFor(() => {
-      expect(setSize).toHaveBeenCalledWith(
-        expect.objectContaining({ width: 328, height: 762 }),
-      );
-    });
-    first.unmount();
-    setSize.mockClear();
-
-    // Same zoom, taller content: round(700 × 1.5) + 4 = 1054 exceeds the
-    // mocked work-area cap (900 - 16 = 884), so the clamp still wins.
-    scrollHeight.mockReturnValue(700);
-    renderTrayPanel([provider("codex", "Codex", 61)], {
-      trayScalePercent: 150,
-    });
-
-    await waitFor(() => {
-      expect(setSize).toHaveBeenCalledWith(
-        expect.objectContaining({ width: 328, height: 884 }),
-      );
-    });
-  });
 });

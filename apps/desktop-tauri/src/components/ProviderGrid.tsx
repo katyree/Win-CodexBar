@@ -1,7 +1,7 @@
+import { providerColor } from "../lib/providerPalette";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ProviderUsageSnapshot } from "../types/bridge";
 import { ProviderIcon } from "./providers/ProviderIcon";
-import { getProviderIcon } from "./providers/providerIcons";
 import { useLocale } from "../hooks/useLocale";
 import { prioritizeProviders } from "./providerGridUtils";
 
@@ -162,7 +162,7 @@ export default function ProviderGrid({
               className="provider-grid__weekly-track"
               style={{
                 "--weekly-pct": `${gridPercent(p)}%`,
-                "--weekly-color": getProviderIcon(p.providerId).brandColor,
+                "--weekly-color": providerColor(p.providerId),
               } as CSSProperties}
             />
           )}

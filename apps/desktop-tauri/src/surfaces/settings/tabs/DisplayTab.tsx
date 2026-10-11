@@ -3,7 +3,6 @@ import { useLocale } from "../../../hooks/useLocale";
 import { Field, Select, Toggle } from "../../../components/FormControls";
 import type {
   MenuBarDisplayMode,
-  OverviewLayout,
   ProviderCatalogEntry,
   TrayIconMode,
   TrayVisibilityStatusDto,
@@ -211,31 +210,6 @@ export default function DisplayTab({
             />
           </Field>
           <Field
-            label={t("ShowAsUsedLabel")}
-            description={t("ShowAsUsedHelper")}
-            leading
-          >
-            <Toggle
-              checked={settings.showAsUsed}
-              disabled={saving}
-              onChange={(v) => set({ showAsUsed: v })}
-            />
-          </Field>
-          <Field
-            label={t("OverviewLayoutLabel")}
-            description={t("OverviewLayoutHelper")}
-          >
-            <Select
-              value={settings.overviewLayout}
-              disabled={saving}
-              options={[
-                { value: "detailed", label: t("OverviewLayoutDetailed") },
-                { value: "compact", label: t("OverviewLayoutCompact") },
-              ]}
-              onChange={(v) => set({ overviewLayout: v as OverviewLayout })}
-            />
-          </Field>
-          <Field
             label={t("ShowAllTokenAccountsLabel")}
             description={t("ShowAllTokenAccountsHelper")}
             leading
@@ -285,7 +259,20 @@ export default function DisplayTab({
       )}
 
       {mode === "menu" && menuSection === "floating" && (
+        <>
+          <Field
+            label={t("ShowAsUsedLabel")}
+            description={t("ShowAsUsedHelper")}
+            leading
+          >
+            <Toggle
+              checked={settings.showAsUsed}
+              disabled={saving}
+              onChange={(v) => set({ showAsUsed: v })}
+            />
+          </Field>
         <FloatBarSettingsSection settings={settings} saving={saving} set={set} />
+        </>
       )}
     </>
   );

@@ -131,28 +131,7 @@ pub struct WorkAreaRect {
 }
 
 #[tauri::command]
-pub fn get_work_area_rect(app: tauri::AppHandle) -> Result<WorkAreaRect, String> {
-    use tauri::Manager;
-
-    // Prefer the OS-native probe on Windows because it reliably excludes the
-    // taskbar; Tauri's monitor API forwards to the same APIs but we keep the
-    // direct path to preserve parity with the egui build.
-    if let Some(area) = codexbar::host::session::primary_work_area_pixels() {
-        return Ok(WorkAreaRect {
-            x: area.x,
-            y: area.y,
-            width: area.width,
-            height: area.height,
-        });
-    }
-
-    // Cross-platform fallback (macOS: NSScreen.visibleFrame; Linux: GTK /
-    // X11 work-area) via Tauri's monitor wrapper. Require a window so tao's
-    // screen backend is initialised.
-    let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| "Main window is not available".to_string())?;
-
+pub fn get_work_area_rect(window: tauri::WebviewWindow) -> Result<WorkAreaRect, String> {
     let monitor = window
         .current_monitor()
         .map_err(|e| e.to_string())?

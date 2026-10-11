@@ -74,15 +74,9 @@ describe("DisplayTab menu settings", () => {
     expect(set).toHaveBeenCalledWith({ showPace: true });
   });
 
-  it("updates the Overview layout preference", () => {
-    const set = vi.fn();
-    renderTab(set);
-
-    fireEvent.change(screen.getByRole("combobox"), {
-      target: { value: "compact" },
-    });
-
-    expect(set).toHaveBeenCalledWith({ overviewLayout: "compact" });
+  it("does not offer manual overview layout adjustment", () => {
+    renderTab(vi.fn());
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
   it("updates the tray panel always-on-top preference", () => {

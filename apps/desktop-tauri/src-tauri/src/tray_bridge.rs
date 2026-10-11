@@ -603,7 +603,7 @@ mod tests {
         // key / window_properties source / panel-size reference) for the
         // flyout window's builder — the properties themselves are unchanged.
         let props = SurfaceMode::TrayPanel.window_properties();
-        assert!(props.resizable && props.blur_dismiss && props.skip_taskbar);
+        assert!(!props.resizable && props.blur_dismiss && props.skip_taskbar);
     }
 
     #[test]

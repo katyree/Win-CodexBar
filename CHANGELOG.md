@@ -14,6 +14,14 @@
 - Use expanded, collapsible Claude and Codex account sections with Add account below the rows; keep the floating bar's usage footprint when authentication expires.
 - Let the tray panel be moved and resized again: drag the strip along its top to move it (the spot is remembered; double-click returns it next to the tray), resize from any edge or corner, and stop it from closing when a resize starts on its outer frame. Its remembered size is now kept in logical pixels, so it fits monitors with different scaling (a size saved by an earlier version is reset to the automatic size once).
 
+## [Windows] 0.70.2-beta.4 - 2026-10-11
+
+### Improved
+
+- Apply the C1 lilac and rose palette to provider tiles, settings, and the floating bar.
+- Show used percentages in the tray overview, with provider details available from each tile.
+- Automatically size the tray to its content and monitor, without scrolling or manual size controls.
+
 ## [Windows] 0.70.2-beta.3 - 2026-10-10
 
 ### Improved

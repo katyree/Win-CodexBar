@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
-import { getCurrentWindow, type Window } from "@tauri-apps/api/window";
+import { useEffect, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { BootstrapState, ProviderUsageSnapshot, UsageSpendSummary } from "../types/bridge";
 import type { LocaleKey } from "../i18n/keys";
 import { costPeriodShortLabel } from "../lib/costPeriod";
@@ -12,15 +12,11 @@ import {
   openSettingsWindow,
   resetFlyoutPosition,
 } from "../lib/tauri";
-import {
-  TRAY_SCALE_MAX,
-  TRAY_SCALE_MIN,
-  TRAY_SCALE_STEP,
-  useTrayPanelController,
-} from "../hooks/useTrayPanelController";
+import { useTrayPanelController } from "../hooks/useTrayPanelController";
 import { useStayAwakeStatus } from "../hooks/useStayAwakeStatus";
 import MenuCard from "../components/MenuCard";
-import { getProviderIcon } from "../components/providers/providerIcons";
+import { providerColor } from "../lib/providerPalette";
+import ProviderTile from "../components/ProviderTile";
 import MenuSurface, { MenuEmpty } from "../components/MenuSurface";
 import UpdateBanner from "../components/UpdateBanner";
 import ProviderGrid from "../components/ProviderGrid";
@@ -49,12 +45,6 @@ const HAS_STATUS_PAGE = new Set([
   "openrouter", "vertexai", "windsurf", "xai",
 ]);
 
-const TRAY_ACCENTS: Record<string, string> = {
-  codex: "#79b6ff",
-  claude: "#ffa88d",
-  copilot: "#c3a3ff",
-};
-
 /**
  * Tray popover surface — two modes like macOS CodexBar:
  * 1. Overview (default): provider grid + all cards stacked
@@ -68,18 +58,12 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
     isRefreshing,
     refreshingProviderIds,
     hasCachedData,
-    trayScaleDraft,
-    trayScale,
-    trayScaleFillPercent,
-    handleTrayScaleChange,
     sorted,
     gridProviders,
     selectedProviderId,
     gridExpanded,
     setGridExpanded,
     visibleProviders,
-    wideColumns,
-    useWideColumns,
     requestLayout,
     footerRows,
     updateState,
@@ -95,26 +79,6 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
     handleGestureEnd,
     revealClassName,
   } = useTrayPanelController(state);
-
-  const zoomRow = (
-    <div className="menu-surface__footer-row menu-surface__footer-zoom">
-      <span>{t("PanelZoom")}</span>
-      <input
-        type="range"
-        className="menu-surface__footer-zoom-slider"
-        min={TRAY_SCALE_MIN}
-        max={TRAY_SCALE_MAX}
-        step={TRAY_SCALE_STEP}
-        value={trayScaleDraft}
-        aria-label={t("PanelZoom")}
-        onChange={(e) => handleTrayScaleChange(Number(e.target.value))}
-        style={{ "--zoom-fill": `${trayScaleFillPercent}%` } as CSSProperties}
-      />
-      <span className="menu-surface__footer-zoom-value">
-        {trayScaleDraft}%
-      </span>
-    </div>
-  );
 
   const banner = (
     <UpdateBanner
@@ -145,14 +109,12 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
             resetTimeRelative: settings.resetTimeRelative,
             showResetWhenExhausted: settings.showResetWhenExhausted,
             showPace: settings.showPace ?? true,
-            showAsUsed: settings.showAsUsed,
+            showAsUsed: true,
             compactOverview:
               selectedProviderId === null && settings.overviewLayout !== "detailed",
             costSummaryDisplayStyle: settings.costSummaryDisplayStyle,
           }}
-          accentColor={settings.providerAccentColors[p.providerId]
-            ?? TRAY_ACCENTS[p.providerId]
-            ?? getProviderIcon(p.providerId).brandColor}
+          accentColor={settings.providerAccentColors[p.providerId] ?? providerColor(p.providerId)}
           onLayoutChange={requestLayout}
         />
       </div>
@@ -175,9 +137,7 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
       <div className={revealClassName}>
         <MenuSurface
           banner={banner}
-          footerLead={zoomRow}
           footerRows={footerRows}
-          style={{ zoom: trayScale }}
         >
           {stayAwakeStatus}
           {settings.agentSessionsEnabled && <AgentSessions />}
@@ -195,16 +155,14 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
     <div className={revealClassName}>
       <MenuSurface
         banner={banner}
-        footerLead={zoomRow}
         footerRows={footerRows}
-        style={{ zoom: trayScale }}
       >
         {stayAwakeStatus}
         {settings.agentSessionsEnabled && <AgentSessions />}
         <ProviderGrid
           providers={gridProviders}
           selectedProviderId={selectedProviderId}
-          showAsUsed={settings.showAsUsed}
+          showAsUsed
           showProviderIcons={settings.switcherShowsIcons}
           expanded={gridExpanded}
           onExpandedChange={setGridExpanded}
@@ -221,22 +179,17 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
             t={t}
           />
         )}
-        <div className="menu-stack">
-          {useWideColumns
-            ? wideColumns.map((column) => (
-                <div
-                  className="menu-stack__column"
-                  key={column.map((p) => p.providerId).join("|") || "empty"}
-                >
-                  {column.map(renderProviderCard)}
-                </div>
-              ))
-            : visibleProviders.map((p, idx) => (
-                <Fragment key={p.providerId}>
-                  {idx > 0 && <div className="menu-stack__sep" />}
-                  {renderProviderCard(p)}
-                </Fragment>
-              ))}
+        <div className={selectedProviderId ? "menu-stack" : "menu-stack provider-tiles"}>
+          {selectedProviderId
+            ? visibleProviders.map(renderProviderCard)
+            : visibleProviders.map(provider => (
+              <ProviderTile key={provider.providerId} provider={provider}
+                resetTimeRelative={settings.resetTimeRelative}
+                showProviderIcon={settings.switcherShowsIcons}
+                hidePersonalInfo={settings.hidePersonalInfo}
+                isRefreshing={refreshingProviderIds.has(provider.providerId)}
+                onSelect={() => handleGridClick(provider.providerId)} />
+            ))}
         </div>
         {/* Context actions — detail mode only, matches macOS actionsSection */}
         {selectedProviderId &&
@@ -295,35 +248,6 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
   );
 }
 
-type ResizeDirection = Parameters<Window["startResizeDragging"]>[0];
-
-/** Every edge and corner, so a flyout the user moved away from the tray can
- *  be resized from whichever side faces open screen. */
-const RESIZE_GRIPS: ReadonlyArray<{ edge: string; direction: ResizeDirection }> = [
-  { edge: "top", direction: "North" },
-  { edge: "bottom", direction: "South" },
-  { edge: "left", direction: "West" },
-  { edge: "right", direction: "East" },
-  { edge: "topleft", direction: "NorthWest" },
-  { edge: "topright", direction: "NorthEast" },
-  { edge: "bottomleft", direction: "SouthWest" },
-  { edge: "bottomright", direction: "SouthEast" },
-];
-
-/**
- * Window handles for the borderless flyout: a move strip along the top and
- * invisible resize grips on every edge and corner. The native frame left
- * around the borderless WebView2 is only a few pixels wide, so both are driven
- * explicitly with `startDragging` / `startResizeDragging`. Those calls enter a
- * Win32 modal move/size loop which transiently steals focus from the WebView2
- * child — Windows fires a spurious `Focused(false)` the instant the press
- * starts. The backend keeps the flyout open on a blur while a mouse button is
- * held on it, so no gesture guard is armed here; arming one would also keep
- * the next genuine outside click from dismissing the panel for up to 15s.
- *
- * Dragging the strip moves the flyout away from the tray and the backend
- * remembers the spot; double-clicking it anchors the flyout to the tray again.
- */
 function TrayWindowHandles({ moveHint }: { moveHint: string }) {
   return (
     <>
@@ -347,20 +271,6 @@ function TrayWindowHandles({ moveHint }: { moveHint: string }) {
       >
         <span className="tray-move-handle__grip" />
       </div>
-      {RESIZE_GRIPS.map(({ edge, direction }) => (
-        <div
-          key={edge}
-          className={`tray-resize tray-resize--${edge}`}
-          aria-hidden
-          onMouseDown={(e) => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-            void getCurrentWindow()
-              .startResizeDragging(direction)
-              .catch((err) => console.error("[tray-resize] startResizeDragging failed:", err));
-          }}
-        />
-      ))}
     </>
   );
 }

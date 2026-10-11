@@ -346,85 +346,32 @@ body.floatbar-window #root {
   background-color: rgba(20, 22, 26, 0.18);
 }
 
-/* Electric Edge provider capsules. Native sizing still measures this content. */
-.floatbar--floating { gap: calc(8px * var(--floatbar-scale, 1)); color: #e8edf7; }
-.floatbar__name, .floatbar__suffix { display: none; }
+/* C1 provider tiles share the tray palette. */
+.floatbar--floating { gap: calc(8px * var(--floatbar-scale, 1)); color: #f3eef9; }
+.floatbar__name { display: inline; font-weight: 600; }
+.floatbar__suffix { display: inline; }
 .floatbar--floating .floatbar__pill,
-.floatbar--floating .floatbar__cost-pill {
-  --capsule-tone: var(--capsule-accent, var(--brand, #79b6ff));
-  gap: calc(9px * var(--floatbar-scale, 1));
-  padding: calc(11px * var(--floatbar-scale, 1)) calc(15px * var(--floatbar-scale, 1));
-  min-height: calc(56px * var(--floatbar-scale, 1));
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--capsule-tone) 32%, #253044);
-  background: linear-gradient(120deg, color-mix(in srgb, var(--capsule-tone) 12%, #0c111b), #101725);
-  box-shadow: 0 2px 3px #0003;
-  color: #e8edf7;
-}
-.floatbar--floating [data-provider="codex"] { --capsule-accent: #79b6ff; }
-.floatbar--floating [data-provider="claude"] { --capsule-accent: #ffa88d; }
-.floatbar--floating [data-provider="copilot"] { --capsule-accent: #c3a3ff; }
-.floatbar--floating .floatbar__pill--warn { --capsule-tone: #fbbf24; }
-.floatbar--floating .floatbar__pill--crit { --capsule-tone: #fca5a5; }
-.floatbar--floating .floatbar__provider-icon {
-  width: calc(26px * var(--floatbar-scale, 1));
-  height: calc(26px * var(--floatbar-scale, 1));
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--capsule-tone) 14%, transparent);
-  color: var(--capsule-tone);
-}
-.floatbar--floating .floatbar__provider-icon .provider-icon { background: none; box-shadow: none; color: inherit; }
-.floatbar--floating .floatbar__text {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-items: center;
-  gap: calc(5px * var(--floatbar-scale, 1)) calc(14px * var(--floatbar-scale, 1));
-}
-.floatbar--floating .floatbar__name {
-  display: block;
-  grid-column: 1;
-  grid-row: 1;
-  font-size: calc(11px * var(--floatbar-scale, 1));
-  font-weight: 500;
-}
-.floatbar--floating .floatbar__pct {
-  grid-column: 2;
-  grid-row: 1;
-  font-size: calc(23px * var(--floatbar-scale, 1));
-  color: var(--capsule-tone);
-  text-align: right;
-}
-.floatbar--floating .floatbar__suffix {
-  display: block;
-  grid-column: 2;
-  grid-row: 2;
-  font-size: calc(9px * var(--floatbar-scale, 1));
-  font-weight: 400;
-  color: #a7b2c7;
-  text-align: right;
-}
-.floatbar--floating .floatbar__reset {
-  grid-column: 1;
-  grid-row: 2;
-  justify-content: flex-start;
-  font-size: calc(10px * var(--floatbar-scale, 1));
-  color: #a7b2c7;
-  opacity: 1;
-}
-.floatbar--floating .floatbar__cost-estimate { color: #a7b2c7; }
-.floatbar--floating .floatbar__handle { background-color: transparent; }
+.floatbar--floating .floatbar__cost-pill,
 .floatbar--floating.floatbar--light-bg .floatbar__pill,
 .floatbar--floating.floatbar--light-bg .floatbar__cost-pill {
-  color: #182333;
-  background: #f3f6fb;
-  border-color: color-mix(in srgb, var(--capsule-tone) 50%, #536178);
+  --capsule-tone: var(--brand, #c3abff);
+  gap: calc(8px * var(--floatbar-scale, 1));
+  padding: calc(12px * var(--floatbar-scale, 1)) calc(15px * var(--floatbar-scale, 1));
+  min-height: calc(56px * var(--floatbar-scale, 1));
+  border-radius: calc(14px * var(--floatbar-scale, 1));
+  border: 1px solid transparent;
+  background: var(--capsule-tone);
+  box-shadow: 0 2px 3px #0003;
+  color: #21152c;
 }
-.floatbar--floating.floatbar--light-bg .floatbar__pct { color: #182333; }
-.floatbar--floating.floatbar--light-bg .floatbar__suffix,
-.floatbar--floating.floatbar--light-bg .floatbar__reset,
-.floatbar--floating.floatbar--light-bg .floatbar__cost-estimate { color: #536178; }
-.floatbar--floating.floatbar--light-bg .floatbar__pill--warn .floatbar__pct { color: #92400e; }
-.floatbar--floating.floatbar--light-bg .floatbar__pill--crit .floatbar__pct { color: #991b1b; }
+.floatbar--floating .floatbar__pct,
+.floatbar--floating.floatbar--light-bg .floatbar__pct { color: #21152c; }
+.floatbar--floating .floatbar__suffix,
+.floatbar--floating .floatbar__reset,
+.floatbar--floating .floatbar__cost-estimate { color: #51415c; }
+.floatbar--floating .provider-icon { filter: brightness(0); opacity: .8; }
+.floatbar--floating .floatbar__pill--warn { border-bottom: 3px solid #8a4800; }
+.floatbar--floating .floatbar__pill--crit { border-bottom: 3px solid #9f173b; }
 @media (forced-colors: active) {
   .floatbar--floating .floatbar__pill,
   .floatbar--floating .floatbar__cost-pill { border-color: CanvasText; }

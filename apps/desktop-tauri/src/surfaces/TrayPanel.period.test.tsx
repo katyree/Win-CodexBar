@@ -44,6 +44,7 @@ const windowMocks = vi.hoisted(() => ({
     setSize: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     scaleFactor: vi.fn().mockResolvedValue(1),
+    onMoved: vi.fn().mockResolvedValue(() => {}), onScaleChanged: vi.fn().mockResolvedValue(() => {}),
     onResized: vi.fn().mockResolvedValue(() => {}),
     innerSize: vi.fn().mockResolvedValue({ width: 328, height: 200 }),
   })),

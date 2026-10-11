@@ -1,3 +1,4 @@
+import { providerColor } from "../lib/providerPalette";
 import {
   useCallback,
   useEffect,
@@ -19,7 +20,6 @@ import {
   refreshProvidersIfStale,
 } from "../lib/tauri";
 import { ProviderIcon } from "../components/providers/ProviderIcon";
-import { getProviderIcon } from "../components/providers/providerIcons";
 import { costPeriodShortLabel } from "../lib/costPeriod";
 import { describeProviderState } from "../lib/providerState";
 import { resetDescriptionFallback, windowDetailText } from "../lib/usageWindows";
@@ -133,7 +133,7 @@ function CostPill({
   const today = summary.todayCost == null ? null : format(summary.todayCost, "USD");
   const periodCost = summary.periodCost == null ? null : format(summary.periodCost, "USD");
   const iconSize = Math.round(10 * scale);
-  const brand = getProviderIcon(summary.providerId).brandColor;
+  const brand = providerColor(summary.providerId);
   const title = [
     today ? `${todayLabel} ${today}` : null,
     periodCost ? `${periodLabel} ${periodCost}` : null,
@@ -229,7 +229,7 @@ function ProviderPill({
     else if (remaining <= highRemaining) tone = "warn";
   }
 
-  const brand = getProviderIcon(provider.providerId).brandColor;
+  const brand = providerColor(provider.providerId);
   const infoText = localizeProviderText(rateWindow.resetDescription?.trim(), t) || "—";
   const label = state.isProblem
     ? stateLabel

@@ -334,6 +334,7 @@ function getMetricPaceView(snap: RateWindowSnapshot): MetricPaceView {
   return { kind: "none" };
 }
 type MetricRowDisplay = {
+  largePercent?: boolean;
   resetTimeRelative: boolean;
   showResetWhenExhausted?: boolean;
   showPace?: boolean;
@@ -349,7 +350,7 @@ type MetricRowDisplay = {
  *   • UsageProgressBar (capsule, 6pt)
  *   • HStack: "N% used"  · ·  reset countdown (right-aligned, secondary)
  */
-function MetricRow({
+export function MetricRow({
   title,
   snap,
   exhaustedLabel,
@@ -422,7 +423,7 @@ function MetricRow({
     );
   }
   return (
-    <div className="menu-metric">
+    <div className={`menu-metric${isInformational ? " menu-metric--informational" : ""}`}>
       <span className="menu-metric__title">{title}</span>
       {!isInformational && (
         <div className="menu-metric__bar">
@@ -435,7 +436,7 @@ function MetricRow({
             ? infoPrimary
             : replacesPercent
               ? resetText
-              : `${Math.round(displayPct)}% ${displayLabel}`}
+              : display.largePercent ? <><span className="menu-metric__number">{Math.round(displayPct)}%</span> <span className="menu-metric__suffix">{displayLabel}</span></> : `${Math.round(displayPct)}% ${displayLabel}`}
         </span>
         {!compactOverview && isInformational &&
           snap.resetDescription?.trim() &&
