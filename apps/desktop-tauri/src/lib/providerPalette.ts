@@ -1,6 +1,6 @@
 export const PROVIDER_PALETTE = [
-  "#C3ABFF", "#F1A8CE", "#9DCFFF", "#98D9BE",
-  "#EAD58F", "#F2B08C", "#AAB9E5", "#D8B9A0",
+  "#b6b6b6", "#bababa", "#c8c8c8", "#c9c9c9",
+  "#d4d4d4", "#bbbbbb", "#b9b9b9", "#bebebe",
 ] as const;
 
 const PROVIDER_COLORS: Record<string, string> = {

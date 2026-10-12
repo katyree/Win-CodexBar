@@ -751,7 +751,7 @@ describe("TrayPanel provider grid", () => {
     );
   });
 
-  it("provider tiles and grid consistently show percent used", async () => {
+  it("provider tiles and grid consistently show percent remaining", async () => {
     const { container, rerender } = renderTrayPanel(
       [provider("claude", "Claude", 35)],
       { showAsUsed: true },
@@ -761,8 +761,11 @@ describe("TrayPanel provider grid", () => {
       const track = container.querySelector<HTMLElement>(
         ".provider-grid__weekly-track",
       );
-      expect(track?.style.getPropertyValue("--weekly-pct")).toBe("35%");
+      expect(track?.style.getPropertyValue("--weekly-pct")).toBe("65%");
     });
+
+    expect(container.querySelector('.provider-tile__metrics .menu-metric__number')?.textContent).toBe('65%');
+    expect(container.querySelector('.provider-tile__metrics .menu-metric__suffix')?.textContent).toBe('left');
 
     tauriMocks.getCachedProviders.mockResolvedValue([
       provider("claude", "Claude", 35),
@@ -778,7 +781,7 @@ describe("TrayPanel provider grid", () => {
       const track = container.querySelector<HTMLElement>(
         ".provider-grid__weekly-track",
       );
-      expect(track?.style.getPropertyValue("--weekly-pct")).toBe("35%");
+      expect(track?.style.getPropertyValue("--weekly-pct")).toBe("65%");
     });
   });
 

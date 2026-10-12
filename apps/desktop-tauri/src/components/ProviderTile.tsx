@@ -35,7 +35,7 @@ export default function ProviderTile({ provider, resetTimeRelative, isRefreshing
         <span className="provider-tile__metrics">{windows.map(window => window.snap && (
           <MetricRow key={window.id} title={localizeWindowLabel(window.label, t, language, window.snap.windowMinutes) || t("DetailWindowPrimary")}
             snap={window.snap} exhaustedLabel={t("PanelUsedSuffix")}
-            display={{ largePercent: true, showAsUsed: true, showPace: false, resetTimeRelative }}
+            display={{ largePercent: true, showAsUsed: false, showPace: false, resetTimeRelative }}
             expanded={false} onToggleExpanded={() => {}} />
         ))}</span>}
       <span className="provider-tile__link">{t("PanelUsageDetails")} →</span>

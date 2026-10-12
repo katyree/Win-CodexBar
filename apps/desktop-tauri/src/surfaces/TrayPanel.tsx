@@ -109,7 +109,7 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
             resetTimeRelative: settings.resetTimeRelative,
             showResetWhenExhausted: settings.showResetWhenExhausted,
             showPace: settings.showPace ?? true,
-            showAsUsed: true,
+            showAsUsed: false,
             compactOverview:
               selectedProviderId === null && settings.overviewLayout !== "detailed",
             costSummaryDisplayStyle: settings.costSummaryDisplayStyle,
@@ -162,7 +162,7 @@ export default function TrayPanel({ state }: { state: BootstrapState }) {
         <ProviderGrid
           providers={gridProviders}
           selectedProviderId={selectedProviderId}
-          showAsUsed
+          showAsUsed={false}
           showProviderIcons={settings.switcherShowsIcons}
           expanded={gridExpanded}
           onExpandedChange={setGridExpanded}

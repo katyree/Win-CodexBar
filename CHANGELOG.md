@@ -14,6 +14,14 @@
 - Use expanded, collapsible Claude and Codex account sections with Add account below the rows; keep the floating bar's usage footprint when authentication expires.
 - Let the tray panel be moved and resized again: drag the strip along its top to move it (the spot is remembered; double-click returns it next to the tray), resize from any edge or corner, and stop it from closing when a resize starts on its outer frame. Its remembered size is now kept in logical pixels, so it fits monitors with different scaling (a size saved by an earlier version is reset to the automatic size once).
 
+## [Windows] 0.70.2-beta.5 - 2026-10-12
+
+### Improved
+
+- Apply the approved grayscale theme to tray cards, settings, app-owned menus, charts, and the floating bar.
+- Show percentage remaining in tray cards, provider details, and provider indicators.
+- Retain automatic tray sizing and existing provider and account behavior.
+
 ## [Windows] 0.70.2-beta.4 - 2026-10-11
 
 ### Improved
